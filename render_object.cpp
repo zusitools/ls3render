@@ -181,7 +181,7 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
   for (size_t i = 0, n_subsets = m_ls3_datei.children_SubSet.size(); i < n_subsets; i++) {
     const auto& mesh_subset = m_ls3_datei.children_SubSet[i];
 
-    if (mesh_subset->TypLs3 == 16) { // Lichter
+    if (mesh_subset->TypLs3 == 16) { // Dummy
       continue;
     }
     if (mesh_subset->TypLs3 == 17 && !m_lichter_schaltung.spitzenlichtVorne) {
@@ -227,11 +227,16 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
       TRY(glUniform1i(shaderParameters.uni_tex[j], j));
     }
 
-    TRY(glUniform4f(shaderParameters.uni_color,
-          (mesh_subset->Cd.r + mesh_subset->Ce.r) / 255.0,
-          (mesh_subset->Cd.g + mesh_subset->Ce.g) / 255.0,
-          (mesh_subset->Cd.b + mesh_subset->Ce.b) / 255.0,
+    TRY(glUniform4f(shaderParameters.uni_diffuse_color,
+          mesh_subset->Cd.r / 255.0,
+          mesh_subset->Cd.g / 255.0,
+          mesh_subset->Cd.b / 255.0,
           mesh_subset->Cd.a / 255.0));
+    TRY(glUniform4f(shaderParameters.uni_emissive_color,
+          mesh_subset->Ce.r / 255.0,
+          mesh_subset->Ce.g / 255.0,
+          mesh_subset->Ce.b / 255.0,
+          mesh_subset->Ce.a / 255.0));
 
     TRY(glUniform1i(shaderParameters.uni_texVoreinstellung, texVoreinstellung));
 

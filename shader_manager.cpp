@@ -99,8 +99,10 @@ struct ShaderManager::impl {
         glGetUniformLocation(shader_program, "tex2"));
     m_ShaderParameters.uni_numTextures =
         glGetUniformLocation(shader_program, "numTextures");
-    m_ShaderParameters.uni_color =
-        glGetUniformLocation(shader_program, "color");
+    m_ShaderParameters.uni_diffuse_color =
+        glGetUniformLocation(shader_program, "diffuseColor");
+    m_ShaderParameters.uni_emissive_color =
+        glGetUniformLocation(shader_program, "emissiveColor");
     m_ShaderParameters.uni_alphaCutoff =
         glGetUniformLocation(shader_program, "alphaCutoff");
     m_ShaderParameters.uni_texVoreinstellung =

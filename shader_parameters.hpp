@@ -21,7 +21,8 @@ struct ShaderParameters {
   GLint uni_shear;
   std::vector<GLint> uni_tex;
   GLint uni_numTextures;
-  GLint uni_color;
+  GLint uni_diffuse_color;
+  GLint uni_emissive_color;
   GLint uni_alphaCutoff;
   GLint uni_texVoreinstellung;
 
@@ -45,7 +46,8 @@ struct ShaderParameters {
       CHECK_MINUS_ONE(uni_tex[i]);
     }
     CHECK_MINUS_ONE(uni_numTextures);
-    CHECK_MINUS_ONE(uni_color);
+    CHECK_MINUS_ONE(uni_diffuse_color);
+    CHECK_MINUS_ONE(uni_emissive_color);
     CHECK_MINUS_ONE(uni_alphaCutoff);
     CHECK_MINUS_ONE(uni_texVoreinstellung);
   }

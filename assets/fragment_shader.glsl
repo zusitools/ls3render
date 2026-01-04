@@ -2,7 +2,8 @@ R""(
 #version 150
 
 in vec3 Normal;
-in vec4 Color;
+in vec4 DiffuseColor;
+in vec4 EmissiveColor;
 in vec2 UV1;
 in vec2 UV2;
 
@@ -32,16 +33,17 @@ void main() {
     if (numTextures == 0) {
       // Nur wenn keine Textur angegeben ist, wird vom Farbwert auch die Alpha-Komponente verwendet.
       // Die wird wiederum nur gebraucht, wenn Alpha-Blending aktiv ist.
-      outColor = Color;
+      outColor = DiffuseColor;
     } else {
-      outColor = texColor * vec4(Color.rgb, 1.0);
+      outColor = texColor * vec4(DiffuseColor.rgb, 1.0);
     }
   } else {
-    outColor = vec4(texColor.rgb * Color.rgb, 1.0);
+    outColor = vec4(texColor.rgb * DiffuseColor.rgb, 1.0);
   }
 
   const float ambient = 0.4;
   float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(0, 1, 1)), Normal));
   outColor *= vec4(kd, kd, kd, 1.0);
+  outColor.xyz += EmissiveColor.xyz;
 }
 )""
