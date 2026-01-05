@@ -28,22 +28,22 @@ void main() {
     texColor = mix(texColor, tex2Color, tex2Color.a);
   }
 
+  const float ambient = 0.4;
+  float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(0, 1, 1)), Normal));
+  vec4 baseColor = vec4(kd, kd, kd, 1.0) * DiffuseColor;
+  baseColor.xyz += EmissiveColor.xyz;
+
   if (texVoreinstellung == 4 || (texVoreinstellung >= 6 && texVoreinstellung <= 9)) {
     // Halbtransparenz
     if (numTextures == 0) {
       // Nur wenn keine Textur angegeben ist, wird vom Farbwert auch die Alpha-Komponente verwendet.
       // Die wird wiederum nur gebraucht, wenn Alpha-Blending aktiv ist.
-      outColor = DiffuseColor;
+      outColor = baseColor;
     } else {
-      outColor = texColor * vec4(DiffuseColor.rgb, 1.0);
+      outColor = texColor * vec4(baseColor.rgb, 1.0);
     }
   } else {
-    outColor = vec4(texColor.rgb * DiffuseColor.rgb, 1.0);
+    outColor = vec4(texColor.rgb * baseColor.rgb, 1.0);
   }
-
-  const float ambient = 0.4;
-  float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(0, 1, 1)), Normal));
-  outColor *= vec4(kd, kd, kd, 1.0);
-  outColor.xyz += EmissiveColor.xyz;
 }
 )""
