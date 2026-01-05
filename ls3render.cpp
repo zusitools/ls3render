@@ -1,5 +1,9 @@
 #include "./ls3render.h"
 
+#ifdef HAVE_RENDERDOC
+#include "renderdoc_app.h"
+#endif
+
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -30,6 +34,10 @@
 #include <vector>
 #include <memory>
 #include <utility>
+
+#ifdef HAVE_RENDERDOC
+#include <dlfcn.h>
+#endif
 
 using namespace ls3render;
 
@@ -75,8 +83,20 @@ static float m_cabinetAngle { glm::radians(45.0f) };  // Typically around 45 deg
 static float m_cabinetScale { 0 }; // Foreshortening factor for the Y axis, typically 0.5
 static glm::mat4 m_lastFahrzeugTransform { 1 };
 static GLFWwindow* m_Window { nullptr };
+#ifdef HAVE_RENDERDOC
+RENDERDOC_API_1_3_0 *renderdoc_api { nullptr };
+#endif
 
 ls3render_EXPORT int ls3render_Init() {
+#ifdef HAVE_RENDERDOC
+  if(void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD))
+  {
+    auto RENDERDOC_GetAPI = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
+    [[maybe_unused]] const int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_3_0, (void **)&renderdoc_api);
+    assert(ret == 1);
+  }
+#endif
+
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) {
     std::cerr << "Error initializing GLFW" << std::endl;
@@ -339,6 +359,12 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
     return false;
   }
 
+#ifdef HAVE_RENDERDOC
+  if (renderdoc_api) {
+    renderdoc_api->StartFrameCapture(nullptr, nullptr);
+  }
+#endif
+
   // Create and bind framebuffer & renderbuffer
   GLuint framebuffer;
   TRY(glGenFramebuffers(1, &framebuffer));
@@ -445,6 +471,12 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
   TRY(glDeleteFramebuffers(1, &framebuffer_multisample));
   TRY(glDeleteRenderbuffers(1, &color_renderbuffer_multisample));
   TRY(glDeleteRenderbuffers(1, &depth_renderbuffer_multisample));
+
+#ifdef HAVE_RENDERDOC
+  if (renderdoc_api) {
+    renderdoc_api->EndFrameCapture(nullptr, nullptr);
+  }
+#endif
 
   return true;
 }

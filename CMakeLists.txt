@@ -121,7 +121,13 @@ else()
   endif()
 endif()
 
+set(RENDERDOC_INCLUDE_PATH "" CACHE PATH "Path to Renderdoc API")
+
 target_include_directories(ls3render PUBLIC ${OPENGL_INCLUDE_DIRS} ${glm_INCLUDE_DIRS})
+if (RENDERDOC_INCLUDE_PATH)
+  target_include_directories(ls3render PRIVATE ${RENDERDOC_INCLUDE_PATH})
+  target_compile_definitions(ls3render PRIVATE -DHAVE_RENDERDOC)
+endif()
 target_link_libraries(ls3render PUBLIC ${OPENGL_LIBRARIES} ${glm_LIBRARIES})
 target_link_libraries(ls3render PUBLIC zusi_parser)
 target_compile_definitions(ls3render PRIVATE -Dls3render_EXPORTS)
