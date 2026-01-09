@@ -326,7 +326,9 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
     }
 
     // Alpha cutoff
-    if (texVoreinstellung == 8) {
+    if (numTextures == 0) {
+        TRY(glUniform1f(shaderParameters.uni_alphaCutoff, 0));
+    } else if (texVoreinstellung == 8) {
         // Laubaehnliche Strukturen, Alpharef 100
         TRY(glUniform1f(shaderParameters.uni_alphaCutoff, 100.0 / 255.0));
     } else if (texVoreinstellung == 12) {
