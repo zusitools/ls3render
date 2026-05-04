@@ -310,7 +310,7 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
     // einen Faktor von ~275 fuer den in der LS3-Datei angegebenen Bias.
     TRY(glPolygonOffset(0, 275 * bias));
 
-    if (texVoreinstellung == 4) {
+    if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12)) {
         // Enable alpha blending
         TRY(glEnable(GL_BLEND));
         TRY(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
