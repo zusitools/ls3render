@@ -29,7 +29,7 @@ void main() {
   }
 
   const float ambient = 0.4;
-  float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(0, 1, 1)), Normal));
+  float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(-1, 0, 1)), Normal));
   vec4 baseColor = vec4(kd, kd, kd, 1.0) * DiffuseColor;
   baseColor.xyz += EmissiveColor.xyz;
 

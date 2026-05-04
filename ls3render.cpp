@@ -255,13 +255,13 @@ void SetOutputSize() {
   }
 
   m_OutputHeight = (m_ModelTopZ - m_ModelBottomZ) * m_PixelProMeter;
-  m_OutputWidth = (m_ModelFrontX - m_ModelBackX) * m_PixelProMeter;
+  m_OutputWidth = (m_ModelRightY - m_ModelLeftY) * m_PixelProMeter;
 
   const float cabinetX = m_cabinetScale * cos(m_cabinetAngle);
   const float cabinetY = m_cabinetScale * sin(m_cabinetAngle);
-  const float yExtent = m_ModelRightY - m_ModelLeftY;
-  m_OutputWidth += std::abs(cabinetX) * yExtent * m_PixelProMeter;
-  m_OutputHeight += std::abs(cabinetY) * yExtent * m_PixelProMeter;
+  const float xExtent = m_ModelFrontX - m_ModelBackX;
+  m_OutputWidth += std::abs(cabinetX) * xExtent * m_PixelProMeter;
+  m_OutputHeight += std::abs(cabinetY) * xExtent * m_PixelProMeter;
 }
 
 ls3render_EXPORT void ls3render_SetPixelProMeter(int PixelProMeter) {
@@ -396,11 +396,11 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
     return false;
   }
 
-  // Right-side view.
+  // View along the positive x-axis.
   const glm::mat4 view = glm::lookAt(
-      glm::vec3(0.0f,  0.0f, 0.0f),  // position
-      glm::vec3(0.0f, -1.0f, 0.0f),  // lookat
-      glm::vec3(0.0f,  0.0f, 1.0f));  // up
+      glm::vec3(0.0f, 0.0f, 0.0f),  // position
+      glm::vec3(1.0f, 0.0f, 0.0f),  // lookat
+      glm::vec3(0.0f, 0.0f, 1.0f));  // up
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_view, 1, GL_FALSE, glm::value_ptr(view)));
 
   // Create an oblique projection matrix (cabinet effect) by shearing the model along the Z-axis.
@@ -413,18 +413,17 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
 
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_shear, 1, GL_FALSE, glm::value_ptr(shear)));
 
-  // World space x coordinates are in the range (-oo, 0).
-  // Camera space x coordinates are in the range (0, oo).
-  const float left = -m_ModelFrontX - std::abs(cabinetX) * m_ModelRightY; // left
-  const float right = -m_ModelBackX - std::abs(cabinetX) * m_ModelLeftY; // right
+  // Camera space x coordinates correspond to negative world space y coordinates.
+  const float left = -m_ModelRightY + std::abs(cabinetX) * m_ModelBackX; // left
+  const float right = -m_ModelLeftY + std::abs(cabinetX) * m_ModelFrontX; // right
 
   // Camera space y coordinates correspond to world space z coordinates.
-  const float bottom = m_ModelBottomZ - std::abs(cabinetY) * m_ModelRightY; // bottom
-  const float top = m_ModelTopZ - std::abs(cabinetY) * m_ModelLeftY; // top
+  const float bottom = m_ModelBottomZ + std::abs(cabinetY) * m_ModelBackX; // bottom
+  const float top = m_ModelTopZ + std::abs(cabinetY) * m_ModelFrontX; // top
 
-  // Camera space z coordinates correspond to world space y coordinates.
-  const float zNear = m_BBox.first.y - .01f; // zNear
-  const float zFar = m_BBox.second.y + .01f; // zFar
+  // Camera space z coordinates correspond to negative world space x coordinates.
+  const float zNear = -m_BBox.second.x - .01f; // zNear
+  const float zFar = -m_BBox.first.x + .01f; // zFar
 
   const glm::mat4 proj = glm::ortho(left, right, bottom, top, zNear, zFar);
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_proj, 1, GL_FALSE, glm::value_ptr(proj)));
