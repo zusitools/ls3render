@@ -30,7 +30,7 @@
 
 namespace ls3render {
 
-bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen, const ls3render::LichterSchaltung& lichterSchaltung) {
+bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   std::unique_ptr<Zusi> zusi_datei = zusixml::tryParseFile(dateinameOsPfad);
   if (!zusi_datei) {
@@ -92,7 +92,7 @@ bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& 
 
   m_Ls3Dateien.push_back(std::move(zusi_datei));  // keep for later
 
-  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, ani_positionen, lichterSchaltung);
+  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, ani_positionen);
   render_object->setTransform(transform);
   m_RenderObjects.push_back(std::move(render_object));
 
@@ -158,7 +158,7 @@ bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& 
       transform_verkn = translate_verkn_animation * transform_verkn;
     }
 
-    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, ani_positionen, lichterSchaltung);
+    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, ani_positionen);
   }
 
   return true;

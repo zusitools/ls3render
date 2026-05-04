@@ -29,6 +29,7 @@
 #include <cmath>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -57,31 +58,37 @@ void glfw_error_callback(int error, const char* description) {
 
 }
 
+// Sentinel values so the union with geometry yields the geometry's bounds.
+static const auto kInvalidBBox = std::make_pair(
+    glm::vec3 { std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max() },
+    glm::vec3 { std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest() });
+
 static Scene m_Scene {};
 static ShaderParameters m_ShaderParameters {};
-static std::unordered_map<int, float> m_AniPositionen {
-  { 6, 0.5f },   // Gleiskruemmung
-  { 7, 0.5f },   // Gleiskruemmung
-  { 14, 0.5f },  // Neigetechnik
-};
+// Keine vehicle-spezifischen Animationen mehr (Stromabnehmer/Gleiskruemmung/Neigetechnik).
+// Eine leere Map laesst alle Animationen mit Defaultposition 0 ablaufen.
+static std::unordered_map<int, float> m_AniPositionen {};
 static int m_PixelProMeter { 50 };
 static int m_Multisampling { 0 };
-static auto m_BBox = std::make_pair<glm::vec3, glm::vec3>({}, {});
+static auto m_BBox = kInvalidBBox;
 
+// Aus der Bounding Box abgeleitete Modellgrenzen. Werden in ls3render_AddSignalFrame
+// gesetzt, sobald die Szene mindestens einen Frame enthaelt.
 static float m_ModelBackX { 0 };
 static float m_ModelFrontX { 0 };
-
-// Fixed values to allow aligning of separately generated images.
-static float m_ModelTopZ = { 5.5 };
-static float m_ModelBottomZ = { 0 };
-static float m_ModelLeftY = { -1.862 }; // loading gauge G2
-static float m_ModelRightY = { 1.862 }; // loading gauge G2
+static float m_ModelTopZ { 0 };
+static float m_ModelBottomZ { 0 };
+static float m_ModelLeftY { 0 };
+static float m_ModelRightY { 0 };
 
 static short m_OutputHeight { 0 };
 static short m_OutputWidth { 0 };
 static float m_cabinetAngle { glm::radians(45.0f) };  // Typically around 45 degrees
 static float m_cabinetScale { 0 }; // Foreshortening factor for the Y axis, typically 0.5
-static glm::mat4 m_lastFahrzeugTransform { 1 };
 static GLFWwindow* m_Window { nullptr };
 #ifdef HAVE_RENDERDOC
 RENDERDOC_API_1_3_0 *renderdoc_api { nullptr };
@@ -240,16 +247,21 @@ ls3render_EXPORT int ls3render_Cleanup() {
 }
 
 void SetOutputSize() {
-  assert(m_ModelBackX <= m_ModelFrontX);
-  assert(m_ModelTopZ >= m_ModelBottomZ);
+  if (m_ModelFrontX < m_ModelBackX || m_ModelTopZ < m_ModelBottomZ || m_ModelRightY < m_ModelLeftY) {
+    // Noch kein Frame hinzugefuegt: keine sinnvolle Ausgabegroesse.
+    m_OutputWidth = 0;
+    m_OutputHeight = 0;
+    return;
+  }
 
   m_OutputHeight = (m_ModelTopZ - m_ModelBottomZ) * m_PixelProMeter;
   m_OutputWidth = (m_ModelFrontX - m_ModelBackX) * m_PixelProMeter;
 
   const float cabinetX = m_cabinetScale * cos(m_cabinetAngle);
   const float cabinetY = m_cabinetScale * sin(m_cabinetAngle);
-  m_OutputWidth += std::abs(cabinetX) * (std::abs(m_ModelRightY) + std::abs(m_ModelLeftY)) * m_PixelProMeter;
-  m_OutputHeight += std::abs(cabinetY) * (std::abs(m_ModelRightY) + std::abs(m_ModelLeftY)) * m_PixelProMeter;
+  const float yExtent = m_ModelRightY - m_ModelLeftY;
+  m_OutputWidth += std::abs(cabinetX) * yExtent * m_PixelProMeter;
+  m_OutputHeight += std::abs(cabinetY) * yExtent * m_PixelProMeter;
 }
 
 ls3render_EXPORT void ls3render_SetPixelProMeter(int PixelProMeter) {
@@ -269,29 +281,22 @@ ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skal
   SetOutputSize();
 }
 
-ls3render_EXPORT int ls3render_AddFahrzeug(const char* Dateiname, float OffsetX, float Fahrzeuglaenge, int Gedreht, float StromabnehmerHoehe, int Stromabnehmer1Oben, int Stromabnehmer2Oben, int Stromabnehmer3Oben, int Stromabnehmer4Oben, int SpitzenlichtVorneAn, int SpitzenlichtHintenAn, int SchlusslichtVorneAn, int SchlusslichtHintenAn) {
+ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
+    float PosX, float PosY, float PosZ,
+    float PhiX, float PhiY, float PhiZ,
+    float SkX, float SkY, float SkZ) {
   try {
-    constexpr float kMaxStromabnehmerHoehe = 2.5;
-    const float stromabnehmerAniPos = glm::clamp((m_ModelTopZ - StromabnehmerHoehe) / kMaxStromabnehmerHoehe, 0.0f, 1.0f);
-    m_AniPositionen[8] = Stromabnehmer1Oben ? stromabnehmerAniPos : 0.0f;
-    m_AniPositionen[9] = Stromabnehmer2Oben ? stromabnehmerAniPos : 0.0f;
-    m_AniPositionen[10] = Stromabnehmer3Oben ? stromabnehmerAniPos : 0.0f;
-    m_AniPositionen[11] = Stromabnehmer4Oben ? stromabnehmerAniPos : 0.0f;
+    // Transform-Reihenfolge analog zu <Verknuepfte> in scene.cpp: erst Rotation,
+    // dann Skalierung, dann Translation. Eine Skalierungs-Komponente von 0
+    // wird wie in Zusi als 1 interpretiert.
+    const auto zeroToOne = [](float f) { return f == 0.0f ? 1.0f : f; };
+    glm::mat4 transform = glm::eulerAngleZYX(PhiZ, PhiY, PhiX);
+    transform = glm::scale(glm::mat4 { 1 },
+        glm::vec3(zeroToOne(SkX), zeroToOne(SkY), zeroToOne(SkZ))) * transform;
+    transform = glm::translate(glm::mat4 { 1 },
+        glm::vec3(PosX, PosY, PosZ)) * transform;
 
-    m_lastFahrzeugTransform = glm::mat4 { 1 };
-    m_lastFahrzeugTransform = glm::translate(m_lastFahrzeugTransform, glm::vec3(-OffsetX, 0.0f, 0.0f));
-    if (Gedreht) {
-      m_lastFahrzeugTransform = glm::translate(m_lastFahrzeugTransform, glm::vec3(-Fahrzeuglaenge, 0.0f, 0.0f));
-      m_lastFahrzeugTransform = glm::rotate(m_lastFahrzeugTransform, 3.141592f, glm::vec3(0.0f, 0.0f, 1.0f));
-    }
-
-    const LichterSchaltung lichterSchaltung {
-      SpitzenlichtVorneAn != 0,
-      SpitzenlichtHintenAn != 0,
-      SchlusslichtVorneAn != 0,
-      SchlusslichtHintenAn != 0,
-    };
-    if (!m_Scene.LadeLandschaft(zusixml::ZusiPfad::vonOsPfad(Dateiname), m_lastFahrzeugTransform, m_AniPositionen, lichterSchaltung)) {
+    if (!m_Scene.LadeLandschaft(zusixml::ZusiPfad::vonOsPfad(Dateiname), transform, m_AniPositionen)) {
       return false;
     }
 
@@ -299,37 +304,10 @@ ls3render_EXPORT int ls3render_AddFahrzeug(const char* Dateiname, float OffsetX,
 
     m_ModelBackX = m_BBox.first.x;
     m_ModelFrontX = m_BBox.second.x;
-    SetOutputSize();
-  } catch (const std::exception& e) {
-    std::cerr << e.what() << std::endl;
-    return false;
-  } catch (...) {
-    return false;
-  }
-
-  return true;
-}
-
-ls3render_EXPORT int ls3render_AddBeladung(const char* Dateiname, float OffsetX, float OffsetY, float OffsetZ, float PhiX, float PhiY, float PhiZ)
-{
-  try {
-    m_AniPositionen[8] = 0;
-    m_AniPositionen[9] = 0;
-    m_AniPositionen[10] = 0;
-    m_AniPositionen[11] = 0;
-
-    const glm::mat4 transform = glm::translate(glm::vec3(-OffsetX, OffsetY, OffsetZ))
-      * glm::eulerAngleXYZ(PhiX, PhiY, PhiZ)
-      * m_lastFahrzeugTransform;
-
-    if (!m_Scene.LadeLandschaft(zusixml::ZusiPfad::vonOsPfad(Dateiname), transform, m_AniPositionen, LichterSchaltung{})) {
-      return false;
-    }
-
-    m_Scene.UpdateBoundingBox(&m_BBox);
-
-    m_ModelBackX = m_BBox.first.x;
-    m_ModelFrontX = m_BBox.second.x;
+    m_ModelLeftY = m_BBox.first.y;
+    m_ModelRightY = m_BBox.second.y;
+    m_ModelBottomZ = m_BBox.first.z;
+    m_ModelTopZ = m_BBox.second.z;
     SetOutputSize();
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
@@ -483,5 +461,13 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
 
 ls3render_EXPORT void ls3render_Reset() {
   m_Scene = Scene {};
-  m_BBox = std::make_pair<glm::vec3, glm::vec3>({}, {});
+  m_BBox = kInvalidBBox;
+  m_ModelBackX = 0;
+  m_ModelFrontX = 0;
+  m_ModelLeftY = 0;
+  m_ModelRightY = 0;
+  m_ModelBottomZ = 0;
+  m_ModelTopZ = 0;
+  m_OutputWidth = 0;
+  m_OutputHeight = 0;
 }

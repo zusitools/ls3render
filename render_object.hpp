@@ -41,16 +41,9 @@ class GLRenderObject : public RenderObject {
 
 };
 
-struct LichterSchaltung {
-  bool spitzenlichtVorne { false };
-  bool spitzenlichtHinten { false };
-  bool schlusslichtVorne { false };
-  bool schlusslichtHinten { false };
-};
-
 class Ls3RenderObject : public GLRenderObject {
   public:
-    Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen, const LichterSchaltung& lichterSchaltung);
+    Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen);
     bool init() override;
     void setTransform(glm::mat4 transform);
     void updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) override;
@@ -61,7 +54,6 @@ class Ls3RenderObject : public GLRenderObject {
     const Landschaft& m_ls3_datei;
     glm::mat4 m_transform { 1 };
     const std::unordered_map<int, float> m_ani_positionen;
-    const LichterSchaltung m_lichter_schaltung;
 
     glm::mat4 getTransform(size_t subset_index) const;
 };

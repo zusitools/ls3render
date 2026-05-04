@@ -50,49 +50,32 @@ ls3render_EXPORT void ls3render_SetMultisampling(int Samples);
 ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skalierung);
 
 /**
- * Fuegt ein neues Fahrzeug hinzu.
+ * Fuegt einen Signal-Frame zur aktuellen Szene hinzu. Mehrfachaufrufe sind erlaubt;
+ * jeder Frame wird in dieselbe Szene eingefuegt, sodass auch Signale mit mehreren
+ * SignalFrame-Eintraegen gemeinsam gerendert werden koennen.
  *
  * Macht vorherige Rueckgabewerte von @ref ls3render_GetBildbreite, @ref ls3render_GetBildhoehe und @ref ls3render_GetAusgabepufferGroesse ungueltig.
  *
- * @param Dateiname Der Dateiname des Fahrzeugs (Dateisystempfad, kein Zusi-Pfad)
+ * @param Dateiname OS-Pfad der LS3-Datei (entspricht <SignalFrame><Datei Dateiname=...>; kein Zusi-Pfad).
  *
- * @param OffsetX Die horizontale Position des Fahrzeugnullpunktes in Metern. Hoehere Werte -> weiter rechts.
+ * @param PosX X-Koordinate aus <SignalFrame><p ...>.
+ * @param PosY Y-Koordinate aus <SignalFrame><p ...>.
+ * @param PosZ Z-Koordinate aus <SignalFrame><p ...>.
  *
- * @param Fahrzeuglaenge Die Fahrzeuglaenge in Metern (angegeben in den Fahrzeug-Grunddaten).
- * @param Gedreht Ob das Fahrzeug gedreht eingereiht ist.
+ * @param PhiX Eulerwinkel X (Bogenmass) aus <SignalFrame><phi ...>.
+ * @param PhiY Eulerwinkel Y (Bogenmass) aus <SignalFrame><phi ...>.
+ * @param PhiZ Eulerwinkel Z (Bogenmass) aus <SignalFrame><phi ...>.
  *
- * @param StromabnehmerHoehe Die Einbauhoehe des Stromabnehmers in Metern (angegeben in den Fahrzeug-Grunddaten).
- * @param Stromabnehmer1Oben 1, wenn Stromabnehmer 1 gehoben ist, sonst 0.
- * @param Stromabnehmer2Oben 1, wenn Stromabnehmer 2 gehoben ist, sonst 0.
- * @param Stromabnehmer3Oben 1, wenn Stromabnehmer 3 gehoben ist, sonst 0.
- * @param Stromabnehmer4Oben 1, wenn Stromabnehmer 4 gehoben ist, sonst 0.
- *
- * @param SpitzenlichtVorneAn 1, wenn Mesh-Subsets vom Typ "Spitzenlicht vorne" angezeigt werden sollen, sonst 0.
- * @param SpitzenlichtHintenAn 1, wenn Mesh-Subsets vom Typ "Spitzenlicht hinten" angezeigt werden sollen, sonst 0.
- * @param SchlusslichtVorneAn 1, wenn Mesh-Subsets vom Typ "Schlusslicht vorne" angezeigt werden sollen, sonst 0.
- * @param SchlusslichtHintenAn 1, wenn Mesh-Subsets vom Typ "Schlusslicht hinten" angezeigt werden sollen, sonst 0.
+ * @param SkX Skalierung X aus <SignalFrame><sk ...>; 0 wird als 1 interpretiert (Zusi-Konvention).
+ * @param SkY Skalierung Y aus <SignalFrame><sk ...>; 0 wird als 1 interpretiert.
+ * @param SkZ Skalierung Z aus <SignalFrame><sk ...>; 0 wird als 1 interpretiert.
  *
  * @return 1 bei Erfolg, 0 bei Fehlschlag.
  */
-ls3render_EXPORT int ls3render_AddFahrzeug(const char* Dateiname, float OffsetX, float Fahrzeuglaenge, int Gedreht, float StromabnehmerHoehe, int Stromabnehmer1Oben, int Stromabnehmer2Oben, int Stromabnehmer3Oben, int Stromabnehmer4Oben, int SpitzenlichtVorneAn, int SpitzenlichtHintenAn, int SchlusslichtVorneAn, int SchlusslichtHintenAn);
-
-/**
- * Fuegt die 3D-Datei einer Fahrzeugbeladung zum zuletzt hinzugefügten Fahrzeug hinzu.
- *
- * Macht vorherige Rueckgabewerte von @ref ls3render_GetBildbreite, @ref ls3render_GetBildhoehe und @ref ls3render_GetAusgabepufferGroesse ungueltig.
- *
- * @param Dateiname Der Dateiname des Fahrzeugs (Dateisystempfad, kein Zusi-Pfad)
- *
- * @param OffsetX Die X-Koordinate der Beladung, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- * @param OffsetY Die Y-Koordinate der Beladung, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- * @param OffsetZ Die Z-Koordinate der Beladung, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- * @param PhiX Die X-Drehung der Beladung im Bogenmaß, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- * @param PhiY Die Y-Drehung der Beladung im Bogenmaß, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- * @param PhiZ Die Z-Drehung der Beladung im Bogenmaß, wie in der Beladungs-Baugruppe im Fahrzeug angegeben
- *
- * @return 1 bei Erfolg, 0 bei Fehlschlag.
- */
-ls3render_EXPORT int ls3render_AddBeladung(const char* Dateiname, float OffsetX, float OffsetY, float OffsetZ, float PhiX, float PhiY, float PhiZ);
+ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
+    float PosX, float PosY, float PosZ,
+    float PhiX, float PhiY, float PhiZ,
+    float SkX, float SkY, float SkZ);
 
 /**
  * @return Die Breite des zu rendernden Bildes in Pixeln.
@@ -117,7 +100,7 @@ ls3render_EXPORT int ls3render_GetAusgabepufferGroesse();
 ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer);
 
 /**
- * Entfernt alle Fahrzeuge.
+ * Entfernt alle Signal-Frames aus der aktuellen Szene.
  *
  * Macht vorherige Rueckgabewerte von @ref ls3render_GetBildbreite, @ref ls3render_GetBildhoehe und @ref ls3render_GetAusgabepufferGroesse ungueltig.
  */

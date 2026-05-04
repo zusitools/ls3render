@@ -13,13 +13,12 @@ int main(int /*argc*/, char** argv) {
     return 1;
   }
 
-  if (!ls3render_AddFahrzeug(argv[1], 0, 0, false, 0, false, false, false, false, false, false, false, false)) {
+  if (!ls3render_AddSignalFrame(argv[1],
+          /*Pos=*/0.0f, 0.0f, 0.0f,
+          /*Phi=*/0.0f, 0.0f, 0.0f,
+          /*Sk=*/0.0f, 0.0f, 0.0f)) {
     return 1;
   }
-
-  //ls3render_AddFahrzeug("/mnt/zusi/Zusi3/OmegaDatenFull/RollingStock/Deutschland/Epoche5/Elektrotriebwagen/450/GT8-100D_2S-M/Neulack2010/GT8-100D_A.lod.ls3", 0, 13.92, false, 0, false, false, false, false);
-  //ls3render_AddFahrzeug("/mnt/zusi/Zusi3/OmegaDatenFull/RollingStock/Deutschland/Epoche5/Elektrotriebwagen/450/GT8-100D_2S-M/Neulack2010/GT8-100D_C_Klappfenster.lod.ls3", 13.92, 9.77, false, 3.8374, true, true, true, true);
-  //ls3render_AddFahrzeug("/mnt/zusi/Zusi3/OmegaDatenFull/RollingStock/Deutschland/Epoche5/Elektrotriebwagen/450/GT8-100D_2S-M/Neulack2010/GT8-100D_A.lod.ls3", 13.92+9.77, 13.92, true, 0, false, false, false, false);
 
   std::vector<uint8_t> buf(ls3render_GetAusgabepufferGroesse());
   if (!ls3render_Render(buf.data())) {

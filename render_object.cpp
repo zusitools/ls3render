@@ -53,8 +53,8 @@ GLRenderObject::~GLRenderObject() {
   cleanup();
 }
 
-Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen, const LichterSchaltung& lichterSchaltung) : GLRenderObject(),
-    m_ls3_datei(ls3_datei), m_ani_positionen(ani_positionen), m_lichter_schaltung{lichterSchaltung} {}
+Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen) : GLRenderObject(),
+    m_ls3_datei(ls3_datei), m_ani_positionen(ani_positionen) {}
 
 bool Ls3RenderObject::init() {
   TRY(glGenVertexArrays(1, &m_vao));
@@ -184,16 +184,9 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
     if (mesh_subset->TypLs3 == 16) { // Dummy
       continue;
     }
-    if (mesh_subset->TypLs3 == 17 && !m_lichter_schaltung.spitzenlichtVorne) {
-      continue;
-    }
-    if (mesh_subset->TypLs3 == 18 && !m_lichter_schaltung.schlusslichtVorne) {
-      continue;
-    }
-    if (mesh_subset->TypLs3 == 19 && !m_lichter_schaltung.spitzenlichtHinten) {
-      continue;
-    }
-    if (mesh_subset->TypLs3 == 20 && !m_lichter_schaltung.schlusslichtHinten) {
+    // Fahrzeug-spezifische Subset-Typen (Spitzen-/Schlusslicht): in einem reinen
+    // Signal-Renderer sind diese stets aus.
+    if (mesh_subset->TypLs3 >= 17 && mesh_subset->TypLs3 <= 20) {
       continue;
     }
 

@@ -141,7 +141,7 @@ IF (MINGW)
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/libls3render.def DESTINATION lib)
 ENDIF (MINGW)
 
-# i686-w64-mingw32.static-strip -K _ls3render_AddFahrzeug -K _ls3render_Cleanup -K _ls3render_GetAusgabepufferGroesse -K _ls3render_GetBildbreite -K _ls3render_GetBildhoehe -K _ls3render_Init -K _ls3render_Render -K _ls3render_Reset -K _ls3render_SetPixelProMeter libls3render.dll
+# i686-w64-mingw32.static-strip -K _ls3render_AddSignalFrame -K _ls3render_Cleanup -K _ls3render_GetAusgabepufferGroesse -K _ls3render_GetBildbreite -K _ls3render_GetBildhoehe -K _ls3render_Init -K _ls3render_Render -K _ls3render_Reset -K _ls3render_SetAxonometrieParameter -K _ls3render_SetMultisampling -K _ls3render_SetPixelProMeter libls3render.dll
 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   add_executable (gldemo gldemo.cc)

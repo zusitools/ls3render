@@ -21,12 +21,10 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; i++) {
     std::string dateiname(argv[i]);
     std::cerr << "Rendering " << i << "/" << (argc-1) << ": " << dateiname << std::endl;
-    ls3render_AddFahrzeug(dateiname.c_str(), 0, 0, false,
-        // Stromabnehmer
-        0, false, false, false, false,
-        // Lichter
-        false, false, false, false
-    );
+    ls3render_AddSignalFrame(dateiname.c_str(),
+        /*Pos=*/0.0f, 0.0f, 0.0f,
+        /*Phi=*/0.0f, 0.0f, 0.0f,
+        /*Sk=*/0.0f, 0.0f, 0.0f);
 
     int bufsize = ls3render_GetAusgabepufferGroesse();
 
