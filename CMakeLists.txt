@@ -100,7 +100,7 @@ if (NOT ${GLM_FOUND})
 endif()
 
 include (GenerateExportHeader)
-add_library(ls3render ls3render.cpp scene.cpp render_object.cpp shader_manager.cpp)
+add_library(ls3render OBJECT ls3render.cpp scene.cpp render_object.cpp shader_manager.cpp)
 GENERATE_EXPORT_HEADER(ls3render
   BASE_NAME ls3render
   EXPORT_MACRO_NAME ls3render_EXPORT
