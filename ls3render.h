@@ -93,7 +93,10 @@ ls3render_EXPORT int ls3render_GetBildhoehe();
 ls3render_EXPORT int ls3render_GetAusgabepufferGroesse();
 
 /**
- * Rendert die Szene und schreibt das Ergebnis als unkomprimierte RGBA-Daten in den angegebenen Ausgabepuffer.
+ * Rendert die Szene und schreibt das Ergebnis als unkomprimierte 32-Bit-Pixeldaten
+ * in den angegebenen Ausgabepuffer. Die Byte-Reihenfolge je Pixel ist B, G, R, A
+ * (passend zu GL_BGRA bzw. zum TGA-Truecolor-Format). Die Zeilen sind von unten
+ * nach oben angeordnet (OpenGL-Konvention).
  * @param Ausgabepuffer Ein Zeiger auf den Ausgabepuffer, der mindestens so gross sein muss wie durch @ref ls3render_GetAusgabepufferGroesse angegeben.
  * @return 1 bei Erfolg, 0 bei Fehlschlag.
  */
