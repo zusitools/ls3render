@@ -27,7 +27,7 @@
 #include <optional>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ls3render {
@@ -58,8 +58,8 @@ GLRenderObject::~GLRenderObject() {
   cleanup();
 }
 
-Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen) : GLRenderObject(),
-    m_ls3_datei(ls3_datei), m_ani_positionen(ani_positionen) {}
+Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, float verkn_dimmung_alpha) : GLRenderObject(),
+    m_ls3_datei(ls3_datei), m_aktive_ani_nrs(aktive_ani_nrs), m_verkn_dimmung_alpha(verkn_dimmung_alpha) {}
 
 bool Ls3RenderObject::init() {
   TRY(glGenVertexArrays(1, &m_vao));
@@ -202,6 +202,12 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
       continue;
     }
 
+    const float dimmungAlpha = getDimmungAlpha(i);
+    if (dimmungAlpha <= 0.0f) {
+      // Komplett durchsichtig: nicht zeichnen.
+      continue;
+    }
+
     glm::mat4 transform = getTransform(i);
     TRY(glUniformMatrix4fv(shaderParameters.uni_model, 1, GL_FALSE, glm::value_ptr(transform)));
 
@@ -315,13 +321,15 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
     // einen Faktor von ~275 fuer den in der LS3-Datei angegebenen Bias.
     TRY(glPolygonOffset(0, 275 * bias));
 
-    if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12)) {
+    if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12) || (dimmungAlpha < 1.0f)) {
         // Enable alpha blending
         TRY(glEnable(GL_BLEND));
         TRY(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
     } else {
         TRY(glDisable(GL_BLEND));
     }
+
+    TRY(glUniform1f(shaderParameters.uni_dimmungAlpha, dimmungAlpha));
 
     // Alpha cutoff
     if (numTextures == 0) {
@@ -347,32 +355,27 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
   return true;
 }
 
-glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
-  std::optional<AniPunkt> subset_animation;
+namespace {
 
-  for (const auto& a : m_ls3_datei.children_MeshAnimation) {
-    std::optional<float> t;
-    if (a->AniIndex >= 0 && static_cast<decltype(subset_index)>(a->AniIndex) == subset_index) {
-      for (const auto& def : m_ls3_datei.children_Animation) {
-        if (std::find_if(
-            std::begin(def->children_AniNrs),
-            std::end(def->children_AniNrs),
-            [&a](const auto& aniNrs) {
-              return aniNrs->AniNr == a->AniNr;
-            }) != std::end(def->children_AniNrs)) {
-          auto it = m_ani_positionen.find(def->AniID);
-          if (it != std::end(m_ani_positionen)) {
-            t = it->second;
-          }
-          subset_animation = interpoliere(a->children_AniPunkt, t.value_or(0.0f));
-          break;
-        }
-      }
-      if (subset_animation) {
-        break;
-      }
+// Findet die zum angegebenen Subset gehoerende MeshAnimation und liefert den
+// interpolierten AniPunkt zurueck. t=1, wenn die AniNr der MeshAnimation in der
+// Menge der aktiven AniNrs enthalten ist, sonst t=0. Liefert std::nullopt, wenn
+// keine passende MeshAnimation existiert.
+std::optional<AniPunkt> meshAnimationFuerSubset(const Landschaft& ls3_datei,
+    const std::unordered_set<int>& aktive_ani_nrs, size_t subset_index) {
+  for (const auto& a : ls3_datei.children_MeshAnimation) {
+    if (a->AniIndex >= 0 && static_cast<size_t>(a->AniIndex) == subset_index) {
+      const float t = (aktive_ani_nrs.count(a->AniNr) > 0) ? 1.0f : 0.0f;
+      return interpoliere(a->children_AniPunkt, t);
     }
   }
+  return std::nullopt;
+}
+
+}  // namespace
+
+glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
+  const auto subset_animation = meshAnimationFuerSubset(m_ls3_datei, m_aktive_ani_nrs, subset_index);
 
   glm::mat4 transform { 1 };
 
@@ -387,6 +390,12 @@ glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
   }
 
   return m_transform * transform;
+}
+
+float Ls3RenderObject::getDimmungAlpha(size_t subset_index) const {
+  const auto subset_animation = meshAnimationFuerSubset(m_ls3_datei, m_aktive_ani_nrs, subset_index);
+  const float mesh_dimmung_alpha = subset_animation ? (1.0f - subset_animation->AniDimmung) : 1.0f;
+  return m_verkn_dimmung_alpha * mesh_dimmung_alpha;
 }
 
 }

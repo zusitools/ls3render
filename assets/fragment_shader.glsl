@@ -14,6 +14,7 @@ uniform sampler2D tex1;
 uniform sampler2D tex2;
 uniform int numTextures;
 uniform int texVoreinstellung;
+uniform float dimmungAlpha;
 
 void main() {
   vec4 texColor = texture(tex1, UV1);
@@ -45,5 +46,9 @@ void main() {
   } else {
     outColor = vec4(texColor.rgb * baseColor.rgb, 1.0);
   }
+
+  // Animations-Dimmung: 0 = vollstaendig durchsichtig, 1 = vollstaendig undurchsichtig
+  // (in Zusi ist es anders herum!).
+  outColor.a *= dimmungAlpha;
 }
 )""

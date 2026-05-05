@@ -38,7 +38,6 @@ generate_zusi_parser(zusi_parser ${CMAKE_CURRENT_BINARY_DIR}/zusi_parser
     Vertex::p
     Vertex::n
 
-    AnimationsDeklaration::AniID
     AnimationsDeklaration::AniNrs
 
     AnimationsDefinition::AniNr
@@ -47,6 +46,7 @@ generate_zusi_parser(zusi_parser ${CMAKE_CURRENT_BINARY_DIR}/zusi_parser
 
     AniPunkt::p
     AniPunkt::q
+    AniPunkt::AniDimmung
 
     Textur::Datei
 

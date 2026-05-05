@@ -25,6 +25,7 @@ struct ShaderParameters {
   GLint uni_emissive_color;
   GLint uni_alphaCutoff;
   GLint uni_texVoreinstellung;
+  GLint uni_dimmungAlpha;
 
   ShaderParameters() : uni_tex() {}
 
@@ -50,6 +51,7 @@ struct ShaderParameters {
     CHECK_MINUS_ONE(uni_emissive_color);
     CHECK_MINUS_ONE(uni_alphaCutoff);
     CHECK_MINUS_ONE(uni_texVoreinstellung);
+    CHECK_MINUS_ONE(uni_dimmungAlpha);
   }
 
 #undef CHECK_MINUS_ONE

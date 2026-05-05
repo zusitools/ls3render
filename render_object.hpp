@@ -7,7 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cstddef>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct Landschaft;
@@ -43,7 +43,12 @@ class GLRenderObject : public RenderObject {
 
 class Ls3RenderObject : public GLRenderObject {
   public:
-    Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_map<int, float>& ani_positionen);
+    /**
+     * @param aktive_ani_nrs  Menge aktiver AniNr-Werte (siehe @ref Scene::LadeLandschaft).
+     * @param verkn_dimmung_alpha  Multiplikativer Dimmungs-Faktor [0,1] aus
+     *   uebergeordneten Verknuepfungsanimationen.
+     */
+    Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, float verkn_dimmung_alpha);
     bool init() override;
     void setTransform(glm::mat4 transform);
     void updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) override;
@@ -53,9 +58,14 @@ class Ls3RenderObject : public GLRenderObject {
   private:
     const Landschaft& m_ls3_datei;
     glm::mat4 m_transform { 1 };
-    const std::unordered_map<int, float> m_ani_positionen;
+    const std::unordered_set<int> m_aktive_ani_nrs;
+    const float m_verkn_dimmung_alpha;
 
+    /// Transform fuer das angegebene Subset, beruecksichtigt evtl. vorhandene MeshAnimation.
     glm::mat4 getTransform(size_t subset_index) const;
+    /// Multiplikativer Dimmungs-Faktor fuer das angegebene Subset, kombiniert
+    /// die Verknuepfungs- und Mesh-Dimmung.
+    float getDimmungAlpha(size_t subset_index) const;
 };
 
 }

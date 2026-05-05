@@ -24,23 +24,23 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace ls3render {
 
-bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen) {
+bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   std::unique_ptr<Zusi> zusi_datei = zusixml::tryParseFile(dateinameOsPfad);
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
     return false;
   }
-  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, ani_positionen);
+  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, aktive_ani_nrs, dimmung_alpha);
 }
 
-bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen) {
+bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
@@ -101,7 +101,7 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
 
   m_Ls3Dateien.push_back(std::move(zusi_datei));  // keep for later
 
-  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, ani_positionen);
+  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, aktive_ani_nrs, dimmung_alpha);
   render_object->setTransform(transform);
   m_RenderObjects.push_back(std::move(render_object));
 
@@ -122,30 +122,16 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
     if (verkn->Datei.Dateiname.empty()) {
       continue;
     }
-    std::optional<AniPunkt> verkn_animation;
 
+    // Sucht die zur Verknuepfung gehoerende VerknAnimation. Liegt deren AniNr
+    // in der Menge der aktiven AniNrs, wird sie zum Zeitpunkt t=1 ausgewertet,
+    // sonst zum Zeitpunkt t=0.
+    std::optional<AniPunkt> verkn_animation;
     for (const auto& v : ls3_datei->children_VerknAnimation) {
-      std::optional<float> t;
       if (v->AniIndex >= 0 && static_cast<decltype(i)>(v->AniIndex) == i) {
-        for (const auto& def : ls3_datei->children_Animation) {
-          if (std::find_if(
-              std::begin(def->children_AniNrs),
-              std::end(def->children_AniNrs),
-              [&v](const auto& aniNrs) {
-                return aniNrs->AniNr == v->AniNr;
-              }) != std::end(def->children_AniNrs)) {
-            auto it = ani_positionen.find(def->AniID);
-            if (it != std::end(ani_positionen)) {
-              t = it->second;
-            } else {
-            }
-            verkn_animation = interpoliere(v->children_AniPunkt, t.value_or(0.0f));
-            break;
-          }
-        }
-        if (verkn_animation) {
-          break;
-        }
+        const float t = (aktive_ani_nrs.count(v->AniNr) > 0) ? 1.0f : 0.0f;
+        verkn_animation = interpoliere(v->children_AniPunkt, t);
+        break;
       }
     }
 
@@ -167,7 +153,9 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
       transform_verkn = translate_verkn_animation * transform_verkn;
     }
 
-    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, ani_positionen);
+    const float dimmung_alpha_faktor = verkn_animation ? (1.0f - verkn_animation->AniDimmung) : 1.0f;
+
+    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, aktive_ani_nrs, dimmung_alpha * dimmung_alpha_faktor);
   }
 
   return true;

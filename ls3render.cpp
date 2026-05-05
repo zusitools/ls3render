@@ -32,7 +32,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <memory>
 #include <utility>
@@ -227,6 +227,7 @@ ls3render_EXPORT int ls3render_Init() {
   m_ShaderParameters.uni_numTextures = glGetUniformLocation(shader_program, "numTextures");
   m_ShaderParameters.uni_alphaCutoff = glGetUniformLocation(shader_program, "alphaCutoff");
   m_ShaderParameters.uni_texVoreinstellung = glGetUniformLocation(shader_program, "texVoreinstellung");
+  m_ShaderParameters.uni_dimmungAlpha = glGetUniformLocation(shader_program, "dimmungAlpha");
 
   m_ShaderParameters.validate();
 
@@ -312,13 +313,21 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
       return true;
     }
 
-    std::unordered_map<int, float> ani_positionen;
+    // Sammelt die AniNrs aller Animation-Knoten, deren Bit gesetzt ist. Mesh-
+    // und Verknuepfungsanimationen, deren AniNr in dieser Menge liegt, werden
+    // beim Rendern auf t=1 ausgewertet, alle anderen auf t=0.
+    std::unordered_set<int> aktive_ani_nrs;
     for (size_t i = 0; i < n_anim; ++i) {
       if (!animationen[i]) continue;
       // Bei i >= 64 liefert das Bit 0; ueber 64 Animationen pro LS3-Frame sind
       // nicht praxisrelevant.
       const bool gesetzt = (i < 64) && (((bits >> i) & uint64_t{1}) != 0);
-      ani_positionen[animationen[i]->AniID] = gesetzt ? 1.0f : 0.0f;
+      if (!gesetzt) continue;
+      for (const auto& aniNrs : animationen[i]->children_AniNrs) {
+        if (aniNrs) {
+          aktive_ani_nrs.insert(aniNrs->AniNr);
+        }
+      }
     }
 
     // Transform-Reihenfolge analog zu <Verknuepfte> in scene.cpp: erst Rotation,
@@ -331,7 +340,7 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     transform = glm::translate(glm::mat4 { 1 },
         glm::vec3(PosX, PosY, PosZ)) * transform;
 
-    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, ani_positionen)) {
+    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, aktive_ani_nrs)) {
       return false;
     }
 

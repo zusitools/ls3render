@@ -50,6 +50,7 @@ inline std::optional<AniPunkt> interpoliere(const std::vector<std::unique_ptr<An
         rot.y,
         rot.z
       };
+      result.AniDimmung = (1 - factor) * (*links)->AniDimmung + factor * (*rechts)->AniDimmung;
       return result;
     }
   }
