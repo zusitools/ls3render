@@ -32,6 +32,11 @@
 
 namespace ls3render {
 
+namespace {
+// Faktor, mit dem das zZoom-Attribut von Subsets beim Skalieren multipliziert wird.
+constexpr float kZZoomFaktor = 1.0f;
+}
+
 GLRenderObject::GLRenderObject() : m_vao(), m_vbos(), m_ebos(), m_texs(), m_initialized(false) {}
 
 bool GLRenderObject::cleanup() {
@@ -374,6 +379,11 @@ glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
   if (subset_animation) {
     transform = glm::toMat4(glm::quat { subset_animation->q.w, subset_animation->q.x, subset_animation->q.y, subset_animation->q.z });
     transform = glm::translate(glm::mat4 { 1 }, glm::vec3(subset_animation->p.x, subset_animation->p.y, subset_animation->p.z)) * transform;
+  }
+
+  const float zZoom = m_ls3_datei.children_SubSet[subset_index]->zZoom;
+  if (zZoom != 0.0f) {
+    transform = transform * glm::scale(glm::mat4 { 1 }, glm::vec3((1 + zZoom) * kZZoomFaktor));
   }
 
   return m_transform * transform;
