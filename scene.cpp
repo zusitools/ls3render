@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -30,17 +31,17 @@
 
 namespace ls3render {
 
-bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, float dimmung_alpha) {
+bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   std::unique_ptr<Zusi> zusi_datei = zusixml::tryParseFile(dateinameOsPfad);
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
     return false;
   }
-  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, aktive_ani_nrs, dimmung_alpha);
+  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, aktive_ani_nrs, overlay_ani_nrs, dimmung_alpha);
 }
 
-bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, float dimmung_alpha) {
+bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
@@ -101,8 +102,11 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
 
   m_Ls3Dateien.push_back(std::move(zusi_datei));  // keep for later
 
-  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, aktive_ani_nrs, dimmung_alpha);
+  auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, aktive_ani_nrs, overlay_ani_nrs, dimmung_alpha);
   render_object->setTransform(transform);
+  // Subset-Overlays direkt nach setTransform sammeln, bevor weitere Render-
+  // Objekte (durch rekursive Verknuepfungen) hinzukommen.
+  render_object->collectBlinkOverlays(m_BlinkOverlays);
   m_RenderObjects.push_back(std::move(render_object));
 
   for (size_t counter = 0, len = ls3_datei->children_Verknuepfte.size(); counter < len; counter++) {
@@ -127,10 +131,12 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
     // in der Menge der aktiven AniNrs, wird sie zum Zeitpunkt t=1 ausgewertet,
     // sonst zum Zeitpunkt t=0.
     std::optional<AniPunkt> verkn_animation;
+    bool verknuepfung_blinkt = false;
     for (const auto& v : ls3_datei->children_VerknAnimation) {
       if (v->AniIndex >= 0 && static_cast<decltype(i)>(v->AniIndex) == i) {
         const float t = (aktive_ani_nrs.count(v->AniNr) > 0) ? 1.0f : 0.0f;
         verkn_animation = interpoliere(v->children_AniPunkt, t);
+        verknuepfung_blinkt = (overlay_ani_nrs.count(v->AniNr) > 0);
         break;
       }
     }
@@ -155,7 +161,35 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
 
     const float dimmung_alpha_faktor = verkn_animation ? (1.0f - verkn_animation->AniDimmung) : 1.0f;
 
-    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, aktive_ani_nrs, dimmung_alpha * dimmung_alpha_faktor);
+    // Falls diese Verknuepfung selbst blinkt, innerhalb der Verknuepfung KEINE
+    // weiteren Blink-Overlays erzeugen (sonst entstehen verschachtelte Sterne).
+    static const std::unordered_set<int> kEmptyAniNrs;
+    const auto& sub_overlay_ani_nrs = verknuepfung_blinkt ? kEmptyAniNrs : overlay_ani_nrs;
+
+    const size_t render_object_start = m_RenderObjects.size();
+    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, aktive_ani_nrs, sub_overlay_ani_nrs, dimmung_alpha * dimmung_alpha_faktor);
+    const size_t render_object_end = m_RenderObjects.size();
+
+    if (verknuepfung_blinkt && render_object_end > render_object_start) {
+      // Welt-Bbox aller fuer diese Verknuepfung erzeugten Render-Objekte vereinigen.
+      auto verkn_bbox = std::make_pair(
+          glm::vec3 { std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max() },
+          glm::vec3 { std::numeric_limits<float>::lowest(),
+                      std::numeric_limits<float>::lowest(),
+                      std::numeric_limits<float>::lowest() });
+      for (size_t k = render_object_start; k < render_object_end; ++k) {
+        m_RenderObjects[k]->updateBoundingBox(&verkn_bbox);
+      }
+      if (verkn_bbox.first.x <= verkn_bbox.second.x
+          && verkn_bbox.first.y <= verkn_bbox.second.y
+          && verkn_bbox.first.z <= verkn_bbox.second.z) {
+        const glm::vec3 center = 0.5f * (verkn_bbox.first + verkn_bbox.second);
+        const float radius = 0.5f * glm::length(verkn_bbox.second - verkn_bbox.first);
+        m_BlinkOverlays.push_back(BlinkOverlay { center, radius });
+      }
+    }
   }
 
   return true;
@@ -196,6 +230,6 @@ void Scene::FreeGraphicsCardMemory() {
   }
 }
 
-Scene::Scene() : m_Ls3Dateien(), m_RenderObjects() {}
+Scene::Scene() : m_Ls3Dateien(), m_RenderObjects(), m_BlinkOverlays() {}
 
 }

@@ -9,6 +9,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "./scene.hpp"
 #include "./shader_parameters.hpp"
 #include "./utils.hpp"
 #include "./macros.hpp"
@@ -58,8 +59,8 @@ GLRenderObject::~GLRenderObject() {
   cleanup();
 }
 
-Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, float verkn_dimmung_alpha) : GLRenderObject(),
-    m_ls3_datei(ls3_datei), m_aktive_ani_nrs(aktive_ani_nrs), m_verkn_dimmung_alpha(verkn_dimmung_alpha) {}
+Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float verkn_dimmung_alpha) : GLRenderObject(),
+    m_ls3_datei(ls3_datei), m_aktive_ani_nrs(aktive_ani_nrs), m_overlay_ani_nrs(overlay_ani_nrs), m_verkn_dimmung_alpha(verkn_dimmung_alpha) {}
 
 bool Ls3RenderObject::init() {
   TRY(glGenVertexArrays(1, &m_vao));
@@ -108,67 +109,107 @@ void Ls3RenderObject::setTransform(glm::mat4 transform) {
   m_transform = transform;
 }
 
-void Ls3RenderObject::updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) {
-  for (size_t i = 0, n_subsets = m_ls3_datei.children_SubSet.size(); i < n_subsets; i++) {
-    const auto& mesh_subset = m_ls3_datei.children_SubSet[i];
-    if (mesh_subset->children_Face.empty()) {
-      continue;
+std::optional<std::pair<glm::vec3, glm::vec3>>
+Ls3RenderObject::computeSubsetWorldBBox(size_t subset_index) const {
+  const auto& mesh_subset = m_ls3_datei.children_SubSet[subset_index];
+  if (mesh_subset->children_Face.empty()) {
+    return std::nullopt;
+  }
+
+  glm::mat4 transform = getTransform(subset_index);
+
+  // Berechne Bounding Box zuerst lokal und transformiere dann
+  glm::vec4 min { std::numeric_limits<glm::vec4::value_type>::max(), std::numeric_limits<glm::vec4::value_type>::max(), std::numeric_limits<glm::vec4::value_type>::max(), 1 };
+  glm::vec4 max { std::numeric_limits<glm::vec4::value_type>::lowest(), std::numeric_limits<glm::vec4::value_type>::lowest(), std::numeric_limits<glm::vec4::value_type>::lowest(), 1 };
+
+  // Zaehle nur Vertices, die wirklich verwendet werden
+  std::vector<bool> used_vertices(mesh_subset->children_Vertex.size(), false);
+  for (const auto& dreieck : mesh_subset->children_Face) {
+    for (size_t j = 0; j < 3; j++) {
+      used_vertices[dreieck.i[j]] = true;
     }
+  }
 
-    glm::mat4 transform = getTransform(i);
+  auto updateBoundingBoxForVertex = [&](size_t i) {
+    const auto& vertex = mesh_subset->children_Vertex[i];
+    min.x = std::min(min.x, vertex.p.x);
+    max.x = std::max(max.x, vertex.p.x);
+    min.y = std::min(min.y, vertex.p.y);
+    max.y = std::max(max.y, vertex.p.y);
+    min.z = std::min(min.z, vertex.p.z);
+    max.z = std::max(max.z, vertex.p.z);
+  };
 
-    // Berechne Bounding Box zuerst lokal und transformiere dann
-    glm::vec4 min { std::numeric_limits<glm::vec4::value_type>::max(), std::numeric_limits<glm::vec4::value_type>::max(), std::numeric_limits<glm::vec4::value_type>::max(), 1 };
-    glm::vec4 max { std::numeric_limits<glm::vec4::value_type>::lowest(), std::numeric_limits<glm::vec4::value_type>::lowest(), std::numeric_limits<glm::vec4::value_type>::lowest(), 1 };
-
-    // Zaehle nur Vertices, die wirklich verwendet werden
-    std::vector<bool> used_vertices(mesh_subset->children_Vertex.size(), false);
-    for (const auto& dreieck : mesh_subset->children_Face) {
-      for (size_t j = 0; j < 3; j++) {
-        used_vertices[dreieck.i[j]] = true;
-      }
+  if (std::find(std::cbegin(used_vertices), std::cend(used_vertices), false) == std::cend(used_vertices)) {
+    // all vertices used
+    for (size_t i = 0; i < mesh_subset->children_Vertex.size(); ++i) {
+      updateBoundingBoxForVertex(i);
     }
-
-    auto updateBoundingBoxForVertex = [&](size_t i) {
-      const auto& vertex = mesh_subset->children_Vertex[i];
-      min.x = std::min(min.x, vertex.p.x);
-      max.x = std::max(max.x, vertex.p.x);
-      min.y = std::min(min.y, vertex.p.y);
-      max.y = std::max(max.y, vertex.p.y);
-      min.z = std::min(min.z, vertex.p.z);
-      max.z = std::max(max.z, vertex.p.z);
-    };
-
-    if (std::find(std::cbegin(used_vertices), std::cend(used_vertices), false) == std::cend(used_vertices)) {
-      // all vertices used
-      for (size_t i = 0; i < mesh_subset->children_Vertex.size(); ++i) {
+  } else {
+    for (size_t i = 0; i < mesh_subset->children_Vertex.size(); ++i) {
+      if (__builtin_expect(used_vertices[i] == true, 1)) {
         updateBoundingBoxForVertex(i);
       }
-    } else {
-      for (size_t i = 0; i < mesh_subset->children_Vertex.size(); ++i) {
-        if (__builtin_expect(used_vertices[i] == true, 1)) {
-          updateBoundingBoxForVertex(i);
-        }
+    }
+  }
+
+  // Transformiere gesamte Bounding Box (alle 8 Eckpunkte)
+  glm::vec4 v000 = transform * min;
+  glm::vec4 v001 = transform * glm::vec4 { min.x, min.y, max.z, 1 };
+  glm::vec4 v010 = transform * glm::vec4 { min.x, max.y, min.z, 1 };
+  glm::vec4 v011 = transform * glm::vec4 { min.x, max.y, max.z, 1 };
+  glm::vec4 v100 = transform * glm::vec4 { max.x, min.y, min.z, 1 };
+  glm::vec4 v101 = transform * glm::vec4 { max.x, min.y, max.z, 1 };
+  glm::vec4 v110 = transform * glm::vec4 { max.x, max.y, min.z, 1 };
+  glm::vec4 v111 = transform * max;
+
+  glm::vec3 worldMin {
+    std::min({ v000.x, v001.x, v010.x, v011.x, v100.x, v101.x, v110.x, v111.x }),
+    std::min({ v000.y, v001.y, v010.y, v011.y, v100.y, v101.y, v110.y, v111.y }),
+    std::min({ v000.z, v001.z, v010.z, v011.z, v100.z, v101.z, v110.z, v111.z }),
+  };
+  glm::vec3 worldMax {
+    std::max({ v000.x, v001.x, v010.x, v011.x, v100.x, v101.x, v110.x, v111.x }),
+    std::max({ v000.y, v001.y, v010.y, v011.y, v100.y, v101.y, v110.y, v111.y }),
+    std::max({ v000.z, v001.z, v010.z, v011.z, v100.z, v101.z, v110.z, v111.z }),
+  };
+  return std::make_pair(worldMin, worldMax);
+}
+
+void Ls3RenderObject::updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) {
+  for (size_t i = 0, n_subsets = m_ls3_datei.children_SubSet.size(); i < n_subsets; i++) {
+    const auto subsetBBox = computeSubsetWorldBBox(i);
+    if (!subsetBBox) {
+      continue;
+    }
+    boundingBox->first  = glm::min(boundingBox->first,  subsetBBox->first);
+    boundingBox->second = glm::max(boundingBox->second, subsetBBox->second);
+  }
+}
+
+void Ls3RenderObject::collectBlinkOverlays(std::vector<BlinkOverlay>& overlays) const {
+  if (m_overlay_ani_nrs.empty()) {
+    return;
+  }
+  for (size_t i = 0, n_subsets = m_ls3_datei.children_SubSet.size(); i < n_subsets; i++) {
+    bool blinkt = false;
+    for (const auto& a : m_ls3_datei.children_MeshAnimation) {
+      if (a->AniIndex >= 0 && static_cast<size_t>(a->AniIndex) == i
+          && m_overlay_ani_nrs.count(a->AniNr) > 0) {
+        blinkt = true;
+        break;
       }
     }
-
-    // Transformiere gesamte Bounding Box (alle 8 Eckpunkte)
-    glm::vec4 v000 = transform * min;
-    glm::vec4 v001 = transform * glm::vec4 { min.x, min.y, max.z, 1 };
-    glm::vec4 v010 = transform * glm::vec4 { min.x, max.y, min.z, 1 };
-    glm::vec4 v011 = transform * glm::vec4 { min.x, max.y, max.z, 1 };
-    glm::vec4 v100 = transform * glm::vec4 { max.x, min.y, min.z, 1 };
-    glm::vec4 v101 = transform * glm::vec4 { max.x, min.y, max.z, 1 };
-    glm::vec4 v110 = transform * glm::vec4 { max.x, max.y, min.z, 1 };
-    glm::vec4 v111 = transform * max;
-
-    boundingBox->first[0] = std::min({ boundingBox->first.x, v000.x, v001.x, v010.x, v011.x, v100.x, v101.x, v110.x, v111.x });
-    boundingBox->first[1] = std::min({ boundingBox->first.y, v000.y, v001.y, v010.y, v011.y, v100.y, v101.y, v110.y, v111.y });
-    boundingBox->first[2] = std::min({ boundingBox->first.z, v000.z, v001.z, v010.z, v011.z, v100.z, v101.z, v110.z, v111.z });
-
-    boundingBox->second[0] = std::max({ boundingBox->second.x, v000.x, v001.x, v010.x, v011.x, v100.x, v101.x, v110.x, v111.x });
-    boundingBox->second[1] = std::max({ boundingBox->second.y, v000.y, v001.y, v010.y, v011.y, v100.y, v101.y, v110.y, v111.y });
-    boundingBox->second[2] = std::max({ boundingBox->second.z, v000.z, v001.z, v010.z, v011.z, v100.z, v101.z, v110.z, v111.z });
+    if (!blinkt) {
+      continue;
+    }
+    const auto subsetBBox = computeSubsetWorldBBox(i);
+    if (!subsetBBox) {
+      continue;
+    }
+    const glm::vec3 center = 0.5f * (subsetBBox->first + subsetBBox->second);
+    const float radius = 0.5f * glm::length(subsetBBox->second - subsetBBox->first);
+    overlays.push_back(BlinkOverlay { center, radius });
   }
 }
 

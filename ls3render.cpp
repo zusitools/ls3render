@@ -24,6 +24,7 @@
 #include "./scene.hpp"
 #include "./shader_parameters.hpp"
 #include "./render_object.hpp"
+#include "./blink_overlay.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -70,6 +71,12 @@ static const auto kInvalidBBox = std::make_pair(
 
 static Scene m_Scene {};
 static ShaderParameters m_ShaderParameters {};
+static BlinkOverlayRenderer m_BlinkOverlayRenderer {};
+// Hauptshader-Programm fuer das Geometrie-Rendering. In ls3render_Init
+// einmalig erzeugt, anschliessend von ls3render_Render bei jedem Aufruf
+// (re-)gebunden, damit z. B. nach dem Blink-Overlay-Programm das richtige
+// Programm aktiv ist.
+static GLuint m_MainShaderProgram { 0 };
 // Verbleibende, noch nicht konsumierte Bits der Signalbild-ID. Wird in
 // ls3render_AddSignalFrame frame-weise nach rechts geschoben.
 // Default ~0ull: alle Frames sichtbar, alle Animationen auf Position 1.
@@ -193,7 +200,8 @@ ls3render_EXPORT int ls3render_Init() {
   }
 
   // Combine vertex and fragment shaders into a program
-  GLuint shader_program = glCreateProgram();
+  m_MainShaderProgram = glCreateProgram();
+  GLuint shader_program = m_MainShaderProgram;
   TRY(glAttachShader(shader_program, vertex_shader));
   TRY(glAttachShader(shader_program, fragment_shader));
 
@@ -241,10 +249,19 @@ ls3render_EXPORT int ls3render_Init() {
   // Enable depth offset
   TRY(glEnable(GL_POLYGON_OFFSET_FILL));
 
+  // Initialisiere Renderer fuer Blink-Overlays (eigenes Shader-Programm).
+  // Das Programm bindet ls3render_Render bei jedem Aufruf neu, daher hier
+  // bewusst kein zusaetzliches glUseProgram noetig.
+  if (!m_BlinkOverlayRenderer.init()) {
+    std::cerr << "Initializing blink overlay renderer failed.\n";
+    return false;
+  }
+
   return true;
 }
 
 ls3render_EXPORT int ls3render_Cleanup() {
+  m_BlinkOverlayRenderer.cleanup();  // GL-Ressourcen vor Kontext-Zerstoerung freigeben
   TRY_GLFW(glfwTerminate());  // Destroys any remaining windows
   return true;
 }
@@ -316,16 +333,26 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     // Sammelt die AniNrs aller Animation-Knoten, deren Bit gesetzt ist. Mesh-
     // und Verknuepfungsanimationen, deren AniNr in dieser Menge liegt, werden
     // beim Rendern auf t=1 ausgewertet, alle anderen auf t=0.
+    //
+    // overlay_ani_nrs enthaelt zusaetzlich nur diejenigen aktiven AniNrs,
+    // deren Animation als blinkend markiert ist (AniLoopen=1). Fuer Mesh-
+    // bzw. Verknuepfungsanimationen mit einer dieser AniNrs wird in der Szene
+    // ein Blink-Overlay erzeugt.
     std::unordered_set<int> aktive_ani_nrs;
+    std::unordered_set<int> overlay_ani_nrs;
     for (size_t i = 0; i < n_anim; ++i) {
       if (!animationen[i]) continue;
       // Bei i >= 64 liefert das Bit 0; ueber 64 Animationen pro LS3-Frame sind
       // nicht praxisrelevant.
       const bool gesetzt = (i < 64) && (((bits >> i) & uint64_t{1}) != 0);
       if (!gesetzt) continue;
+      const bool blinkend = animationen[i]->AniLoopen;
       for (const auto& aniNrs : animationen[i]->children_AniNrs) {
         if (aniNrs) {
           aktive_ani_nrs.insert(aniNrs->AniNr);
+          if (blinkend) {
+            overlay_ani_nrs.insert(aniNrs->AniNr);
+          }
         }
       }
     }
@@ -340,7 +367,7 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     transform = glm::translate(glm::mat4 { 1 },
         glm::vec3(PosX, PosY, PosZ)) * transform;
 
-    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, aktive_ani_nrs)) {
+    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, aktive_ani_nrs, overlay_ani_nrs)) {
       return false;
     }
 
@@ -380,6 +407,13 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
     std::cerr << "Output width and height must both be > 0" << std::endl;
     return false;
   }
+
+  // Hauptshader-Programm und Standard-GL-State binden. Vorherige Render-Aufrufe
+  // koennen das Programm gewechselt und Tiefentest/Culling deaktiviert haben
+  // (z. B. durch den BlinkOverlayRenderer).
+  TRY(glUseProgram(m_MainShaderProgram));
+  TRY(glEnable(GL_DEPTH_TEST));
+  TRY(glEnable(GL_CULL_FACE));
 
 #ifdef HAVE_RENDERDOC
   if (renderdoc_api) {
@@ -477,6 +511,11 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
   TRY(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
   m_Scene.Render(m_ShaderParameters);
+
+  // Overlay fuer aktuell aktive blinkende Meshes/Verknuepfungen
+  // (gespeichert in der Szene). Zeichnet Strahlen-Sterne ueber der Geometrie.
+  m_BlinkOverlayRenderer.render(view, proj, shear, m_Scene.getBlinkOverlays());
+
   m_Scene.FreeGraphicsCardMemory();
 
   TRY(glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_multisample));
