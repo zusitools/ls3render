@@ -319,7 +319,10 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
 
     // Auf meinem Computer: scale 2^23 = 8388608, ergibt zusammen mit dem Zusi-Faktor
     // einen Faktor von ~275 fuer den in der LS3-Datei angegebenen Bias.
-    TRY(glPolygonOffset(0, 275 * bias));
+    // FIXME: Scheint fürs Signal-Rendern nicht zu reichen, wenn auch kleine Tiefenunterschiede
+    // überbrückt werden sollen (also nicht nur zwischen Polygonen in exakt gleicher Tiefe).
+    // Multipliziere den Faktor mit 10.
+    TRY(glPolygonOffset(0, 2750 * bias));
 
     if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12) || (dimmungAlpha < 1.0f)) {
         // Enable alpha blending
