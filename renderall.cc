@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; i++) {
     std::string dateiname(argv[i]);
     std::cerr << "Rendering " << i << "/" << (argc-1) << ": " << dateiname << std::endl;
+    ls3render_SetSignalbild(~uint64_t{0});
     ls3render_AddSignalFrame(dateiname.c_str(),
         /*Pos=*/0.0f, 0.0f, 0.0f,
         /*Phi=*/0.0f, 0.0f, 0.0f,

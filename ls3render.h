@@ -13,6 +13,8 @@
   #endif
 #endif
 
+#include <stdint.h>
+
 extern "C" {
 
 /**
@@ -50,9 +52,31 @@ ls3render_EXPORT void ls3render_SetMultisampling(int Samples);
 ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skalierung);
 
 /**
+ * Setzt die Signalbild-ID, die von nachfolgenden Aufrufen von @ref ls3render_AddSignalFrame
+ * konsumiert wird. Die ID kodiert bitweise (von rechts gezaehlt), welche Frames sichtbar
+ * sind bzw. wie deren Animationen geschaltet werden:
+ *
+ * - Enthaelt die LS3-Datei eines Frames keine `<Animation>`-Knoten, verbraucht der Frame
+ *   genau ein Bit. Ist das Bit 0, wird der Frame nicht gerendert; ist es 1, wird er
+ *   regulaer dargestellt.
+ * - Enthaelt die LS3-Datei N>0 `<Animation>`-Knoten, verbraucht der Frame N Bits. Bit i
+ *   schaltet die i-te Animation (Dokumentenreihenfolge) auf Position 1 (Bit gesetzt) bzw.
+ *   Position 0 (Bit nicht gesetzt). Der Frame wird in jedem Fall gerendert.
+ *
+ * Default ist `~0ull` (alle Frames sichtbar, alle Animationen auf Position 1). Wird auch
+ * durch @ref ls3render_Reset auf diesen Wert zurueckgesetzt.
+ */
+ls3render_EXPORT void ls3render_SetSignalbild(uint64_t SignalbildID);
+
+/**
  * Fuegt einen Signal-Frame zur aktuellen Szene hinzu. Mehrfachaufrufe sind erlaubt;
  * jeder Frame wird in dieselbe Szene eingefuegt, sodass auch Signale mit mehreren
  * SignalFrame-Eintraegen gemeinsam gerendert werden koennen.
+ *
+ * Konsumiert die unteren Bits der zuvor mit @ref ls3render_SetSignalbild gesetzten
+ * Signalbild-ID (Default `~0ull`) und schiebt diese intern nach rechts. Die Anzahl
+ * konsumierter Bits richtet sich nach der LS3-Datei (siehe Doku zu
+ * @ref ls3render_SetSignalbild).
  *
  * Macht vorherige Rueckgabewerte von @ref ls3render_GetBildbreite, @ref ls3render_GetBildhoehe und @ref ls3render_GetAusgabepufferGroesse ungueltig.
  *
@@ -70,7 +94,8 @@ ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skal
  * @param SkY Skalierung Y aus <SignalFrame><sk ...>; 0 wird als 1 interpretiert.
  * @param SkZ Skalierung Z aus <SignalFrame><sk ...>; 0 wird als 1 interpretiert.
  *
- * @return 1 bei Erfolg, 0 bei Fehlschlag.
+ * @return 1 bei Erfolg, 0 bei Fehlschlag. Auch bei einem aufgrund des Signalbild-Bits
+ *         ausgelassenen Frame wird 1 zurueckgegeben.
  */
 ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     float PosX, float PosY, float PosZ,

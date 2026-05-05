@@ -24,6 +24,13 @@ class Scene {
   Scene();
 
   bool LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen);
+
+  /**
+   * Wie @ref LadeLandschaft, aber mit einer bereits geparsten Zusi-Datei. Der Aufrufer
+   * uebergibt das Eigentum; die Datei wird in der Scene aufbewahrt. Verknuepfte Dateien
+   * werden weiterhin per Pfad nachgeladen.
+   */
+  bool LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen);
   void UpdateBoundingBox(std::pair<glm::vec3, glm::vec3>* bbox);
   bool LoadIntoGraphicsCardMemory();
   void Render(const ShaderParameters& shader_parameters) const;

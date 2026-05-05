@@ -27,6 +27,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <exception>
 #include <iostream>
 #include <limits>
@@ -69,9 +70,10 @@ static const auto kInvalidBBox = std::make_pair(
 
 static Scene m_Scene {};
 static ShaderParameters m_ShaderParameters {};
-// Keine vehicle-spezifischen Animationen mehr (Stromabnehmer/Gleiskruemmung/Neigetechnik).
-// Eine leere Map laesst alle Animationen mit Defaultposition 0 ablaufen.
-static std::unordered_map<int, float> m_AniPositionen {};
+// Verbleibende, noch nicht konsumierte Bits der Signalbild-ID. Wird in
+// ls3render_AddSignalFrame frame-weise nach rechts geschoben.
+// Default ~0ull: alle Frames sichtbar, alle Animationen auf Position 1.
+static uint64_t m_Signalbild { ~uint64_t{0} };
 static int m_PixelProMeter { 50 };
 static int m_Multisampling { 0 };
 static auto m_BBox = kInvalidBBox;
@@ -281,11 +283,44 @@ ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skal
   SetOutputSize();
 }
 
+ls3render_EXPORT void ls3render_SetSignalbild(uint64_t SignalbildID) {
+  m_Signalbild = SignalbildID;
+}
+
 ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     float PosX, float PosY, float PosZ,
     float PhiX, float PhiY, float PhiZ,
     float SkX, float SkY, float SkZ) {
   try {
+    // LS3-Datei vorab parsen, um die Anzahl Animation-Knoten zu kennen
+    // und so die Anzahl konsumierter Bits zu bestimmen.
+    const auto zusiPfad = zusixml::ZusiPfad::vonOsPfad(Dateiname);
+    std::unique_ptr<Zusi> zusi_datei = zusixml::tryParseFile(zusiPfad.alsOsPfad());
+    if (!zusi_datei || !zusi_datei->Landschaft) {
+      std::cerr << "Error parsing " << Dateiname << "\n";
+      return false;
+    }
+    const auto& animationen = zusi_datei->Landschaft->children_Animation;
+    const size_t n_anim = animationen.size();
+    const size_t bits_count = (n_anim > 0) ? n_anim : 1;
+    const uint64_t mask = (bits_count >= 64) ? ~uint64_t{0} : ((uint64_t{1} << bits_count) - 1);
+    const uint64_t bits = m_Signalbild & mask;
+    m_Signalbild = (bits_count >= 64) ? uint64_t{0} : (m_Signalbild >> bits_count);
+
+    if (n_anim == 0 && bits == 0) {
+      // Frame ist nicht sichtbar -> nichts zur Szene hinzufuegen.
+      return true;
+    }
+
+    std::unordered_map<int, float> ani_positionen;
+    for (size_t i = 0; i < n_anim; ++i) {
+      if (!animationen[i]) continue;
+      // Bei i >= 64 liefert das Bit 0; ueber 64 Animationen pro LS3-Frame sind
+      // nicht praxisrelevant.
+      const bool gesetzt = (i < 64) && (((bits >> i) & uint64_t{1}) != 0);
+      ani_positionen[animationen[i]->AniID] = gesetzt ? 1.0f : 0.0f;
+    }
+
     // Transform-Reihenfolge analog zu <Verknuepfte> in scene.cpp: erst Rotation,
     // dann Skalierung, dann Translation. Eine Skalierungs-Komponente von 0
     // wird wie in Zusi als 1 interpretiert.
@@ -296,7 +331,7 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     transform = glm::translate(glm::mat4 { 1 },
         glm::vec3(PosX, PosY, PosZ)) * transform;
 
-    if (!m_Scene.LadeLandschaft(zusixml::ZusiPfad::vonOsPfad(Dateiname), transform, m_AniPositionen)) {
+    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, ani_positionen)) {
       return false;
     }
 
@@ -469,4 +504,5 @@ ls3render_EXPORT void ls3render_Reset() {
   m_ModelTopZ = 0;
   m_OutputWidth = 0;
   m_OutputHeight = 0;
+  m_Signalbild = ~uint64_t{0};
 }

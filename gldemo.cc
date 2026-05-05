@@ -13,6 +13,7 @@ int main(int /*argc*/, char** argv) {
     return 1;
   }
 
+  ls3render_SetSignalbild(~uint64_t{0});
   if (!ls3render_AddSignalFrame(argv[1],
           /*Pos=*/0.0f, 0.0f, 0.0f,
           /*Phi=*/0.0f, 0.0f, 0.0f,

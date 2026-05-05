@@ -37,6 +37,15 @@ bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& 
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
     return false;
   }
+  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, ani_positionen);
+}
+
+bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_map<int, float>& ani_positionen) {
+  const auto& dateinameOsPfad = dateiname.alsOsPfad();
+  if (!zusi_datei) {
+    std::cerr << "Error parsing " << dateinameOsPfad << "\n";
+    return false;
+  }
   auto* ls3_datei = zusi_datei->Landschaft.get();
   if (!ls3_datei) {
     std::cerr << "Not an LS3 file: " << dateinameOsPfad << "\n";
