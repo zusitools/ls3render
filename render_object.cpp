@@ -332,31 +332,6 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
         sizeof(Vertex),
         reinterpret_cast<const GLvoid*>(offsetof(Vertex, U2))));
 
-    auto bias = mesh_subset->zBias;
-
-    // Faktor fuer Depth-Bias bei Zusi: 0.000033 - bezieht sich aber auf Direct3D
-
-    // Wine-Source-Code:
-    /* The Direct3D depth bias is specified in normalized depth coordinates. In
-     * OpenGL the bias is specified in units of "the smallest value that is
-     * guaranteed to produce a resolvable offset for a given implementation". To
-     * convert from D3D to GL we need to divide the D3D depth bias by that value.
-     * We try to detect the value from GL with test draws. On most drivers (r300g,
-     * 600g, Nvidia, i965 on Mesa) the value is 2^23 for fixed point depth buffers,
-     * for r200 and i965 on OSX it is 2^24, for r500 on OSX it is 2^22. For floating
-     * point buffers it is 2^22, 2^23 or 2^24 depending on the GPU. The value does
-     * not depend on the depth buffer precision on any driver.
-     * [...]
-     * Note that SLOPESCALEDEPTHBIAS is a scaling factor for the depth slope, and
-     * doesn't need to be scaled to account for GL vs D3D differences. */
-
-    // Auf meinem Computer: scale 2^23 = 8388608, ergibt zusammen mit dem Zusi-Faktor
-    // einen Faktor von ~275 fuer den in der LS3-Datei angegebenen Bias.
-    // FIXME: Scheint fürs Signal-Rendern nicht zu reichen, wenn auch kleine Tiefenunterschiede
-    // überbrückt werden sollen (also nicht nur zwischen Polygonen in exakt gleicher Tiefe).
-    // Multipliziere den Faktor mit 10.
-    TRY(glPolygonOffset(0, 2750 * bias));
-
     if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12) || (dimmungAlpha < 1.0f)) {
         // Enable alpha blending
         TRY(glEnable(GL_BLEND));
@@ -423,6 +398,11 @@ glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
   const float zZoom = m_ls3_datei.children_SubSet[subset_index]->zZoom;
   if (zZoom != 0.0f) {
     transform = transform * glm::scale(glm::mat4 { 1 }, glm::vec3((1 + zZoom) * kZZoomFaktor));
+  }
+
+  const float zBias = m_ls3_datei.children_SubSet[subset_index]->zBias;
+  if (zBias != 0.0f) {
+    transform = transform * glm::translate(glm::mat4 { 1 }, glm::vec3(0.01 * zBias, 0, 0));
   }
 
   return m_transform * transform;
