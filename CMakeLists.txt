@@ -40,6 +40,7 @@ generate_zusi_parser(zusi_parser ${CMAKE_CURRENT_BINARY_DIR}/zusi_parser
 
     AnimationsDeklaration::AniNrs
     AnimationsDeklaration::AniLoopen
+    AnimationsDeklaration::AniBeschreibung
 
     AnimationsDefinition::AniNr
     AnimationsDefinition::AniIndex

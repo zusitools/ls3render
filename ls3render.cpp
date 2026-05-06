@@ -330,30 +330,25 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
       return true;
     }
 
-    // Sammelt die AniNrs aller Animation-Knoten, deren Bit gesetzt ist. Mesh-
-    // und Verknuepfungsanimationen, deren AniNr in dieser Menge liegt, werden
-    // beim Rendern auf t=1 ausgewertet, alle anderen auf t=0.
-    //
-    // overlay_ani_nrs enthaelt zusaetzlich nur diejenigen aktiven AniNrs,
-    // deren Animation als blinkend markiert ist (AniLoopen=1). Fuer Mesh-
-    // bzw. Verknuepfungsanimationen mit einer dieser AniNrs wird in der Szene
-    // ein Blink-Overlay erzeugt.
-    std::unordered_set<int> aktive_ani_nrs;
-    std::unordered_set<int> overlay_ani_nrs;
+    // Nur in der obersten LS3-Datei werden die `<Animation>`-Knoten anhand der
+    // Signalbild-ID angesteuert: Bit i des fuer diese Datei reservierten
+    // Signalbild-Abschnitts aktiviert den i-ten `<Animation>`-Knoten. In allen
+    // untergeordneten (verknuepften) LS3-Dateien werden die `<Animation>`-
+    // Knoten dagegen ueber den Animationsnamen (`AniBeschreibung`) der hier
+    // ermittelten aktiven Animationen angesteuert. Wir extrahieren daher die
+    // Namen der aktivierten Animationen und reichen sie zusammen mit den
+    // Namen der blinkenden (`AniLoopen=1`) Animationen rekursiv weiter.
+    std::unordered_set<std::string> aktive_ani_namen;
+    std::unordered_set<std::string> blink_ani_namen;
     for (size_t i = 0; i < n_anim; ++i) {
       if (!animationen[i]) continue;
       // Bei i >= 64 liefert das Bit 0; ueber 64 Animationen pro LS3-Frame sind
       // nicht praxisrelevant.
       const bool gesetzt = (i < 64) && (((bits >> i) & uint64_t{1}) != 0);
       if (!gesetzt) continue;
-      const bool blinkend = animationen[i]->AniLoopen;
-      for (const auto& aniNrs : animationen[i]->children_AniNrs) {
-        if (aniNrs) {
-          aktive_ani_nrs.insert(aniNrs->AniNr);
-          if (blinkend) {
-            overlay_ani_nrs.insert(aniNrs->AniNr);
-          }
-        }
+      aktive_ani_namen.insert(animationen[i]->AniBeschreibung);
+      if (animationen[i]->AniLoopen) {
+        blink_ani_namen.insert(animationen[i]->AniBeschreibung);
       }
     }
 
@@ -367,7 +362,7 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     transform = glm::translate(glm::mat4 { 1 },
         glm::vec3(PosX, PosY, PosZ)) * transform;
 
-    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, aktive_ani_nrs, overlay_ani_nrs)) {
+    if (!m_Scene.LadeLandschaft(std::move(zusi_datei), zusiPfad, transform, aktive_ani_namen, blink_ani_namen)) {
       return false;
     }
 

@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -33,29 +34,33 @@ class Scene {
   Scene();
 
   /**
-   * @param aktive_ani_nrs  Menge der AniNr-Werte, die aufgrund aktiver
-   *   `<Animation>`-Knoten in der obersten LS3-Datei aktiv sind. Mesh- und
-   *   Verknuepfungsanimationen mit einem dieser AniNr-Werte werden auf t=1
-   *   ausgewertet, alle anderen auf t=0.
-   * @param overlay_ani_nrs  Teilmenge von @p aktive_ani_nrs, fuer die ein
-   *   Blink-Overlay (Strahlen-Stern) erzeugt werden soll. Praktisch: AniNrs aus
-   *   `<Animation AniLoopen="1">` der obersten LS3-Datei, deren Bit im
-   *   Signalbild gesetzt ist. Fuer eine als blinkend erkannte Verknuepfung
-   *   wird beim rekursiven Aufruf eine leere Menge weitergereicht, damit
-   *   innerhalb der Verknuepfung keine zusaetzlichen Sterne entstehen.
+   * @param aktive_ani_namen  Menge der Animationsnamen (XML-Attribut
+   *   `AniBeschreibung`), die in der obersten LS3-Datei anhand der
+   *   Signalbild-ID aktiviert wurden. In dieser und allen rekursiv geladenen
+   *   verknuepften LS3-Dateien werden diejenigen `<Animation>`-Knoten als
+   *   aktiv betrachtet, deren `AniBeschreibung` in dieser Menge enthalten
+   *   ist. Die zugehoerigen `AniNrs` der jeweiligen Datei steuern die
+   *   `MeshAnimation`- und `VerknAnimation`-Auswertung (t=1 vs. t=0).
+   * @param blink_ani_namen  Teilmenge von @p aktive_ani_namen, fuer die ein
+   *   Blink-Overlay (Strahlen-Stern) erzeugt werden soll. Praktisch:
+   *   Animationsnamen aus der obersten LS3-Datei, deren `<Animation>`-Knoten
+   *   `AniLoopen="1"` haben und deren Bit im Signalbild gesetzt ist. Fuer
+   *   eine als blinkend erkannte Verknuepfung wird beim rekursiven Aufruf
+   *   eine leere Menge weitergereicht, damit innerhalb der Verknuepfung
+   *   keine zusaetzlichen Sterne entstehen.
    * @param verkn_dimmung_alpha  Faktor [0,1], mit dem die Transparenz der gesamten
    *   verknuepften Datei multipliziert wird (entsteht durch
    *   `AniDimmung`-Werte uebergeordneter Verknuepfungsanimationen).
    *   1 = vollstaendig undurchsichtig, 0 = vollstaendig durchsichtig.
    */
-  bool LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha = 1.0f);
+  bool LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<std::string>& aktive_ani_namen, const std::unordered_set<std::string>& blink_ani_namen, float dimmung_alpha = 1.0f);
 
   /**
    * Wie @ref LadeLandschaft, aber mit einer bereits geparsten Zusi-Datei. Der Aufrufer
    * uebergibt das Eigentum; die Datei wird in der Scene aufbewahrt. Verknuepfte Dateien
    * werden weiterhin per Pfad nachgeladen.
    */
-  bool LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha = 1.0f);
+  bool LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<std::string>& aktive_ani_namen, const std::unordered_set<std::string>& blink_ani_namen, float dimmung_alpha = 1.0f);
   void UpdateBoundingBox(std::pair<glm::vec3, glm::vec3>* bbox);
   bool LoadIntoGraphicsCardMemory();
   void Render(const ShaderParameters& shader_parameters) const;

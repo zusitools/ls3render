@@ -31,17 +31,17 @@
 
 namespace ls3render {
 
-bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha) {
+bool Scene::LadeLandschaft(const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<std::string>& aktive_ani_namen, const std::unordered_set<std::string>& blink_ani_namen, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   std::unique_ptr<Zusi> zusi_datei = zusixml::tryParseFile(dateinameOsPfad);
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
     return false;
   }
-  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, aktive_ani_nrs, overlay_ani_nrs, dimmung_alpha);
+  return LadeLandschaft(std::move(zusi_datei), dateiname, transform, aktive_ani_namen, blink_ani_namen, dimmung_alpha);
 }
 
-bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float dimmung_alpha) {
+bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<std::string>& aktive_ani_namen, const std::unordered_set<std::string>& blink_ani_namen, float dimmung_alpha) {
   const auto& dateinameOsPfad = dateiname.alsOsPfad();
   if (!zusi_datei) {
     std::cerr << "Error parsing " << dateinameOsPfad << "\n";
@@ -101,6 +101,28 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
   }
 
   m_Ls3Dateien.push_back(std::move(zusi_datei));  // keep for later
+
+  // Lokale AniNr-Mengen aus den uebergebenen Animationsnamen ableiten:
+  // Ein `<Animation>`-Knoten dieser LS3-Datei gilt als aktiv, wenn sein
+  // `AniBeschreibung` in @p aktive_ani_namen enthalten ist. Die zugehoerigen
+  // `AniNrs` werden in `aktive_ani_nrs` aufgenommen und steuern Mesh- bzw.
+  // Verknuepfungsanimationen in dieser Datei. Animationen, deren Name
+  // zusaetzlich in @p blink_ani_namen liegt (oberste Datei: `AniLoopen=1`),
+  // tragen ihre `AniNrs` zusaetzlich zu `overlay_ani_nrs` bei.
+  std::unordered_set<int> aktive_ani_nrs;
+  std::unordered_set<int> overlay_ani_nrs;
+  for (const auto& anim : ls3_datei->children_Animation) {
+    if (!anim) continue;
+    if (aktive_ani_namen.count(anim->AniBeschreibung) == 0) continue;
+    const bool blinkend = (blink_ani_namen.count(anim->AniBeschreibung) > 0);
+    for (const auto& aniNrs : anim->children_AniNrs) {
+      if (!aniNrs) continue;
+      aktive_ani_nrs.insert(aniNrs->AniNr);
+      if (blinkend) {
+        overlay_ani_nrs.insert(aniNrs->AniNr);
+      }
+    }
+  }
 
   auto render_object = std::make_unique<Ls3RenderObject>(*ls3_datei, aktive_ani_nrs, overlay_ani_nrs, dimmung_alpha);
   render_object->setTransform(transform);
@@ -163,11 +185,11 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
 
     // Falls diese Verknuepfung selbst blinkt, innerhalb der Verknuepfung KEINE
     // weiteren Blink-Overlays erzeugen (sonst entstehen verschachtelte Sterne).
-    static const std::unordered_set<int> kEmptyAniNrs;
-    const auto& sub_overlay_ani_nrs = verknuepfung_blinkt ? kEmptyAniNrs : overlay_ani_nrs;
+    static const std::unordered_set<std::string> kEmptyAniNamen;
+    const auto& sub_blink_ani_namen = verknuepfung_blinkt ? kEmptyAniNamen : blink_ani_namen;
 
     const size_t render_object_start = m_RenderObjects.size();
-    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, aktive_ani_nrs, sub_overlay_ani_nrs, dimmung_alpha * dimmung_alpha_faktor);
+    this->LadeLandschaft(verkn_dateiname, transform * transform_verkn, aktive_ani_namen, sub_blink_ani_namen, dimmung_alpha * dimmung_alpha_faktor);
     const size_t render_object_end = m_RenderObjects.size();
 
     if (verknuepfung_blinkt && render_object_end > render_object_start) {
