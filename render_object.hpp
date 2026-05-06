@@ -75,6 +75,8 @@ class Ls3RenderObject : public GLRenderObject {
     /// Multiplikativer Dimmungs-Faktor fuer das angegebene Subset, kombiniert
     /// die Verknuepfungs- und Mesh-Dimmung.
     float getDimmungAlpha(size_t subset_index) const;
+    /// Gibt zurück, ob das Subset Nr. i Teil einer Blink-Animation ist.
+    bool subsetBlinkt(size_t subset_index) const;
     /// Liefert die Welt-Bounding-Box des angegebenen Subsets, falls dieses
     /// mindestens ein Face hat. Beruecksichtigt @ref getTransform.
     std::optional<std::pair<glm::vec3, glm::vec3>> computeSubsetWorldBBox(size_t subset_index) const;

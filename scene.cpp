@@ -159,7 +159,7 @@ bool Scene::LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::Zusi
       transform_verkn = translate_verkn_animation * transform_verkn;
     }
 
-    const float dimmung_alpha_faktor = verkn_animation ? (1.0f - verkn_animation->AniDimmung) : 1.0f;
+    const float dimmung_alpha_faktor = (verkn_animation && !verknuepfung_blinkt) ? (1.0f - verkn_animation->AniDimmung) : 1.0f;
 
     // Falls diese Verknuepfung selbst blinkt, innerhalb der Verknuepfung KEINE
     // weiteren Blink-Overlays erzeugen (sonst entstehen verschachtelte Sterne).

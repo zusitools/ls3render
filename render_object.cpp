@@ -192,15 +192,7 @@ void Ls3RenderObject::collectBlinkOverlays(std::vector<BlinkOverlay>& overlays) 
     return;
   }
   for (size_t i = 0, n_subsets = m_ls3_datei.children_SubSet.size(); i < n_subsets; i++) {
-    bool blinkt = false;
-    for (const auto& a : m_ls3_datei.children_MeshAnimation) {
-      if (a->AniIndex >= 0 && static_cast<size_t>(a->AniIndex) == i
-          && m_overlay_ani_nrs.count(a->AniNr) > 0) {
-        blinkt = true;
-        break;
-      }
-    }
-    if (!blinkt) {
+    if (!subsetBlinkt(i)) {
       continue;
     }
     const auto subsetBBox = computeSubsetWorldBBox(i);
@@ -437,9 +429,20 @@ glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
 }
 
 float Ls3RenderObject::getDimmungAlpha(size_t subset_index) const {
+  if (subsetBlinkt(subset_index)) {
+    return 1.0f;
+  }
   const auto subset_animation = meshAnimationFuerSubset(m_ls3_datei, m_aktive_ani_nrs, subset_index);
   const float mesh_dimmung_alpha = subset_animation ? (1.0f - subset_animation->AniDimmung) : 1.0f;
   return m_verkn_dimmung_alpha * mesh_dimmung_alpha;
+}
+
+bool Ls3RenderObject::subsetBlinkt(size_t subset_index) const {
+  return std::any_of(
+    m_ls3_datei.children_MeshAnimation.cbegin(),
+    m_ls3_datei.children_MeshAnimation.cend(),
+    [&](const auto& a) { return (a->AniIndex >= 0 && static_cast<size_t>(a->AniIndex) == subset_index && m_overlay_ani_nrs.count(a->AniNr) > 0); }
+  );
 }
 
 }
