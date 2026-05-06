@@ -267,7 +267,7 @@ ls3render_EXPORT int ls3render_Cleanup() {
 }
 
 void SetOutputSize() {
-  if (m_ModelFrontX < m_ModelBackX || m_ModelTopZ < m_ModelBottomZ || m_ModelRightY < m_ModelLeftY) {
+  if (m_ModelBackX < m_ModelFrontX || m_ModelTopZ < m_ModelBottomZ || m_ModelRightY < m_ModelLeftY) {
     // Noch kein Frame hinzugefuegt: keine sinnvolle Ausgabegroesse.
     m_OutputWidth = 0;
     m_OutputHeight = 0;
@@ -279,7 +279,7 @@ void SetOutputSize() {
 
   const float cabinetX = m_cabinetScale * cos(m_cabinetAngle);
   const float cabinetY = m_cabinetScale * sin(m_cabinetAngle);
-  const float xExtent = m_ModelFrontX - m_ModelBackX;
+  const float xExtent = m_ModelBackX - m_ModelFrontX;
   m_OutputWidth += std::abs(cabinetX) * xExtent * m_PixelProMeter;
   m_OutputHeight += std::abs(cabinetY) * xExtent * m_PixelProMeter;
 }
@@ -373,8 +373,8 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
 
     m_Scene.UpdateBoundingBox(&m_BBox);
 
-    m_ModelBackX = m_BBox.first.x;
-    m_ModelFrontX = m_BBox.second.x;
+    m_ModelFrontX = m_BBox.first.x;
+    m_ModelBackX = m_BBox.second.x;
     m_ModelLeftY = m_BBox.first.y;
     m_ModelRightY = m_BBox.second.y;
     m_ModelBottomZ = m_BBox.first.z;
@@ -474,7 +474,9 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
     return false;
   }
 
-  // View along the positive x-axis.
+  // View matrix: World space -> camera space.
+  // The camera looks along the positive x-axis in world space.
+  // After the view transform, we are in camera space: camera at origin facing -z, y up, x right.
   const glm::mat4 view = glm::lookAt(
       glm::vec3(0.0f, 0.0f, 0.0f),  // position
       glm::vec3(1.0f, 0.0f, 0.0f),  // lookat
@@ -482,26 +484,29 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_view, 1, GL_FALSE, glm::value_ptr(view)));
 
   // Create an oblique projection matrix (cabinet effect) by shearing the model along the Z-axis.
-  // After the view transform, we are in camera space: camera at origin facing -z, y up, x right.
   glm::mat4 shear{1};
   const float cabinetX = m_cabinetScale * cos(m_cabinetAngle);
   const float cabinetY = m_cabinetScale * sin(m_cabinetAngle);
   shear[2][0] = -cabinetX; // X axis distortion: x += scale * -z * cos(alpha).
   shear[2][1] = -cabinetY; // Y axis distortion: y += scale * -z * sin(alpha).
 
+  // Shear matrix: camera space -> camera space
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_shear, 1, GL_FALSE, glm::value_ptr(shear)));
 
+  // Projection matrix: Camera space -> clip space.
+
   // Camera space x coordinates correspond to negative world space y coordinates.
-  const float left = -m_ModelRightY + std::abs(cabinetX) * m_ModelBackX; // left
-  const float right = -m_ModelLeftY + std::abs(cabinetX) * m_ModelFrontX; // right
+  const float left = -m_ModelRightY + std::abs(cabinetX) * m_ModelFrontX;
+  const float right = -m_ModelLeftY + std::abs(cabinetX) * m_ModelBackX;
 
   // Camera space y coordinates correspond to world space z coordinates.
-  const float bottom = m_ModelBottomZ + std::abs(cabinetY) * m_ModelBackX; // bottom
-  const float top = m_ModelTopZ + std::abs(cabinetY) * m_ModelFrontX; // top
+  const float bottom = m_ModelBottomZ + std::abs(cabinetY) * m_ModelFrontX;
+  const float top = m_ModelTopZ + std::abs(cabinetY) * m_ModelBackX;
 
   // Camera space z coordinates correspond to negative world space x coordinates.
-  const float zNear = -m_BBox.second.x - .01f; // zNear
-  const float zFar = -m_BBox.first.x + .01f; // zFar
+  // But zNear and zFar are not camera space coordinates, they are distances from the camera.
+  const float zNear = m_ModelFrontX - .01f;
+  const float zFar = m_ModelBackX + .01f;
 
   const glm::mat4 proj = glm::ortho(left, right, bottom, top, zNear, zFar);
   TRY(glUniformMatrix4fv(m_ShaderParameters.uni_proj, 1, GL_FALSE, glm::value_ptr(proj)));
