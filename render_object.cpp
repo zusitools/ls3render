@@ -386,23 +386,20 @@ std::optional<AniPunkt> meshAnimationFuerSubset(const Landschaft& ls3_datei,
 }  // namespace
 
 glm::mat4 Ls3RenderObject::getTransform(size_t subset_index) const {
-  const auto subset_animation = meshAnimationFuerSubset(m_ls3_datei, m_aktive_ani_nrs, subset_index);
-
   glm::mat4 transform { 1 };
 
-  if (subset_animation) {
-    transform = glm::toMat4(glm::quat { subset_animation->q.w, subset_animation->q.x, subset_animation->q.y, subset_animation->q.z });
+  if (const float zZoom = m_ls3_datei.children_SubSet[subset_index]->zZoom; zZoom != 0.0f) {
+    const float scaleFactor = (1 + zZoom) * kZZoomFaktor;
+    transform = glm::scale(glm::mat4 { 1 }, glm::vec3(1, scaleFactor, scaleFactor));
+  }
+
+  if (const float zBias = m_ls3_datei.children_SubSet[subset_index]->zBias; zBias != 0.0f) {
+    transform = glm::translate(glm::mat4 { 1 }, glm::vec3(0.01 * zBias, 0, 0)) * transform;
+  }
+
+  if (const auto subset_animation = meshAnimationFuerSubset(m_ls3_datei, m_aktive_ani_nrs, subset_index)) {
+    transform = glm::toMat4(glm::quat { subset_animation->q.w, subset_animation->q.x, subset_animation->q.y, subset_animation->q.z }) * transform;
     transform = glm::translate(glm::mat4 { 1 }, glm::vec3(subset_animation->p.x, subset_animation->p.y, subset_animation->p.z)) * transform;
-  }
-
-  const float zZoom = m_ls3_datei.children_SubSet[subset_index]->zZoom;
-  if (zZoom != 0.0f) {
-    transform = transform * glm::scale(glm::mat4 { 1 }, glm::vec3((1 + zZoom) * kZZoomFaktor));
-  }
-
-  const float zBias = m_ls3_datei.children_SubSet[subset_index]->zBias;
-  if (zBias != 0.0f) {
-    transform = transform * glm::translate(glm::mat4 { 1 }, glm::vec3(0.01 * zBias, 0, 0));
   }
 
   return m_transform * transform;
