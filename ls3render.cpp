@@ -315,6 +315,13 @@ ls3render_EXPORT int ls3render_AddSignalFrame(const char* Dateiname,
     float PosX, float PosY, float PosZ,
     float PhiX, float PhiY, float PhiZ,
     float SkX, float SkY, float SkZ) {
+  if (Dateiname == nullptr || *Dateiname == '\0') {
+    // Leerer Dateiname dient als Platzhalter: nichts laden/rendern, aber
+    // 1 Bit konsumieren, damit nachfolgende Frames auf den korrekten Bits
+    // der Signalbild-ID operieren.
+    m_Signalbild >>= 1;
+    return true;
+  }
   try {
     // LS3-Datei vorab parsen, um die Anzahl Animation-Knoten zu kennen
     // und so die Anzahl konsumierter Bits zu bestimmen.

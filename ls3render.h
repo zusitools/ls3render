@@ -62,6 +62,9 @@ ls3render_EXPORT void ls3render_SetAxonometrieParameter(float Winkel, float Skal
  * - Enthaelt die LS3-Datei N>0 `<Animation>`-Knoten, verbraucht der Frame N Bits. Bit i
  *   schaltet die i-te Animation (Dokumentenreihenfolge) auf Position 1 (Bit gesetzt) bzw.
  *   Position 0 (Bit nicht gesetzt). Der Frame wird in jedem Fall gerendert.
+ * - Ist der Dateiname leer (oder `nullptr`), wirkt der Frame als Platzhalter: Er
+ *   verbraucht genau ein Bit, wird unabhaengig vom Bitwert nicht gerendert und
+ *   veraendert die Szene nicht.
  *
  * Default ist `~0ull` (alle Frames sichtbar, alle Animationen auf Position 1). Wird auch
  * durch @ref ls3render_Reset auf diesen Wert zurueckgesetzt.
@@ -81,6 +84,10 @@ ls3render_EXPORT void ls3render_SetSignalbild(uint64_t SignalbildID);
  * Macht vorherige Rueckgabewerte von @ref ls3render_GetBildbreite, @ref ls3render_GetBildhoehe und @ref ls3render_GetAusgabepufferGroesse ungueltig.
  *
  * @param Dateiname OS-Pfad der LS3-Datei (entspricht <SignalFrame><Datei Dateiname=...>; kein Zusi-Pfad).
+ *                  Ein leerer Dateiname (`""` oder `nullptr`) wird als Platzhalter
+ *                  behandelt: Der Frame wird nicht gerendert, konsumiert aber genau
+ *                  1 Bit der Signalbild-ID, sodass nachfolgende Frames weiterhin auf
+ *                  den korrekten Bits operieren.
  *
  * @param PosX X-Koordinate aus <SignalFrame><p ...>.
  * @param PosY Y-Koordinate aus <SignalFrame><p ...>.
