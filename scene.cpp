@@ -224,7 +224,7 @@ void Scene::UpdateBoundingBox(std::pair<glm::vec3, glm::vec3>* bbox) {
   }
 }
 
-bool Scene::LoadIntoGraphicsCardMemory() {
+bool Scene::LoadIntoGraphicsCardMemory(TextureCache& textureCache) {
   // Sortiere nach -zOffsetSumme, damit negativer Z-Offset => spaeter zeichnen
   std::stable_sort(std::begin(m_RenderObjects), std::end(m_RenderObjects), [](const auto& lhs, const auto& rhs) {
     // lhs < rhs
@@ -232,7 +232,7 @@ bool Scene::LoadIntoGraphicsCardMemory() {
   });
 
   for (const auto& ro : m_RenderObjects) {
-    if (!ro->init()) {
+    if (!ro->init(textureCache)) {
       std::cerr << "Error initializing render object\n";
       return false;
     }

@@ -18,11 +18,12 @@ namespace ls3render {
 
 struct ShaderParameters;
 struct BlinkOverlay;
+class TextureCache;
 
 class RenderObject {
   public:
     virtual ~RenderObject() {}
-    virtual bool init() = 0;
+    virtual bool init(TextureCache& textureCache) = 0;
     virtual bool cleanup() = 0;
     virtual void updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) = 0;
     virtual void collectBlinkOverlays(std::vector<BlinkOverlay>& overlays) const = 0;
@@ -40,7 +41,6 @@ class GLRenderObject : public RenderObject {
     GLuint m_vao;
     std::vector<GLuint> m_vbos;
     std::vector<GLuint> m_ebos;
-    std::vector<std::vector<GLuint>> m_texs;
     bool m_initialized;
 
 };
@@ -56,7 +56,7 @@ class Ls3RenderObject : public GLRenderObject {
      *   uebergeordneten Verknuepfungsanimationen.
      */
     Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float verkn_dimmung_alpha);
-    bool init() override;
+    bool init(TextureCache& textureCache) override;
     void setTransform(glm::mat4 transform);
     void updateBoundingBox(std::pair<glm::vec3, glm::vec3>* boundingBox) override;
     void collectBlinkOverlays(std::vector<BlinkOverlay>& overlays) const override;
@@ -69,6 +69,11 @@ class Ls3RenderObject : public GLRenderObject {
     const std::unordered_set<int> m_aktive_ani_nrs;
     const std::unordered_set<int> m_overlay_ani_nrs;
     const float m_verkn_dimmung_alpha;
+
+    // Pro Subset eine Liste der zu bindenden GL-Texturhandles.
+    // Die Texturen selbst werden vom @ref TextureCache verwaltet; dieses
+    // Objekt haelt nur nicht-besitzende Handles und loescht sie nicht.
+    std::vector<std::vector<GLuint>> m_texs;
 
     /// Transform fuer das angegebene Subset, beruecksichtigt evtl. vorhandene MeshAnimation.
     glm::mat4 getTransform(size_t subset_index) const;

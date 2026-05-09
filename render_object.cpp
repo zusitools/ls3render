@@ -13,7 +13,7 @@
 #include "./shader_parameters.hpp"
 #include "./utils.hpp"
 #include "./macros.hpp"
-#include "./texture.hpp"
+#include "./texture_cache.hpp"
 
 #include "zusi_parser/zusi_types.hpp"
 
@@ -38,14 +38,11 @@ namespace {
 constexpr float kZZoomFaktor = 1.0f;
 }
 
-GLRenderObject::GLRenderObject() : m_vao(), m_vbos(), m_ebos(), m_texs(), m_initialized(false) {}
+GLRenderObject::GLRenderObject() : m_vao(), m_vbos(), m_ebos(), m_initialized(false) {}
 
 bool GLRenderObject::cleanup() {
   TRY(glDeleteBuffers(m_vbos.size(), m_vbos.data()));
   TRY(glDeleteBuffers(m_ebos.size(), m_ebos.data()));
-  for (const auto& texs : m_texs) {
-    TRY(glDeleteTextures(texs.size(), texs.data()));
-  }
   TRY(glDeleteVertexArrays(1, &m_vao));
   m_initialized = false;
   return true;
@@ -62,14 +59,14 @@ GLRenderObject::~GLRenderObject() {
 Ls3RenderObject::Ls3RenderObject(const Landschaft& ls3_datei, const std::unordered_set<int>& aktive_ani_nrs, const std::unordered_set<int>& overlay_ani_nrs, float verkn_dimmung_alpha) : GLRenderObject(),
     m_ls3_datei(ls3_datei), m_aktive_ani_nrs(aktive_ani_nrs), m_overlay_ani_nrs(overlay_ani_nrs), m_verkn_dimmung_alpha(verkn_dimmung_alpha) {}
 
-bool Ls3RenderObject::init() {
+bool Ls3RenderObject::init(TextureCache& textureCache) {
   TRY(glGenVertexArrays(1, &m_vao));
   TRY(glBindVertexArray(m_vao));
 
   auto n_subsets = m_ls3_datei.children_SubSet.size();
   m_vbos.resize(n_subsets);
   m_ebos.resize(n_subsets);
-  m_texs.resize(n_subsets);
+  m_texs.assign(n_subsets, {});
 
   TRY(glGenBuffers(n_subsets, m_vbos.data()));
   TRY(glGenBuffers(n_subsets, m_ebos.data()));
@@ -85,19 +82,15 @@ bool Ls3RenderObject::init() {
     TRY(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebos[i]));
     TRY(glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_subset->children_Face.size() * sizeof(Face), mesh_subset->children_Face.data(), GL_STATIC_DRAW));
 
-    auto n_texturen = mesh_subset->children_Textur.size();
-    m_texs[i].resize(n_texturen);
-    TRY(glGenTextures(n_texturen, m_texs[i].data()));
+    const auto n_texturen = mesh_subset->children_Textur.size();
+    m_texs[i].reserve(n_texturen);
     for (size_t j = 0; j < n_texturen; j++) {
-      Texture texture;
-#ifndef NDEBUG
-      std::cerr << "Loading image " << mesh_subset->children_Textur[j]->Datei.Dateiname << std::endl;
-#endif
-      TRY(glBindTexture(GL_TEXTURE_2D, m_texs[i][j]));
-      if (!texture.load_DDS(mesh_subset->children_Textur[j]->Datei.Dateiname)) {
-        std::cerr << "Loading image " << mesh_subset->children_Textur[j]->Datei.Dateiname << " failed" << std::endl;
+      const auto& dateiname = mesh_subset->children_Textur[j]->Datei.Dateiname;
+      const GLuint tex = textureCache.getOrLoad(dateiname);
+      if (tex == 0) {
         return false;
       }
+      m_texs[i].push_back(tex);
     }
   }
 

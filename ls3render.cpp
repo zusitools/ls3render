@@ -20,11 +20,11 @@
 #include "zusi_parser/utils.hpp"
 
 #include "./macros.hpp"
-#include "./texture.hpp"
 #include "./scene.hpp"
 #include "./shader_parameters.hpp"
 #include "./render_object.hpp"
 #include "./blink_overlay.hpp"
+#include "./texture_cache.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -72,6 +72,11 @@ static const auto kInvalidBBox = std::make_pair(
 static Scene m_Scene {};
 static ShaderParameters m_ShaderParameters {};
 static BlinkOverlayRenderer m_BlinkOverlayRenderer {};
+// Cache fuer geladene Texturen. Lebt ueber die einzelnen ls3render_Render-
+// Aufrufe hinweg, sodass eine Texturdatei nur beim ersten Bedarf vom
+// Datentraeger geladen wird. Wird in ls3render_Reset und in ls3render_Cleanup
+// (vor glfwTerminate) explizit geleert.
+static TextureCache m_TextureCache {};
 // Hauptshader-Programm fuer das Geometrie-Rendering. In ls3render_Init
 // einmalig erzeugt, anschliessend von ls3render_Render bei jedem Aufruf
 // (re-)gebunden, damit z. B. nach dem Blink-Overlay-Programm das richtige
@@ -261,6 +266,7 @@ ls3render_EXPORT int ls3render_Init() {
 }
 
 ls3render_EXPORT int ls3render_Cleanup() {
+  m_TextureCache.clear();  // GL-Texturen vor Kontext-Zerstoerung freigeben
   m_BlinkOverlayRenderer.cleanup();  // GL-Ressourcen vor Kontext-Zerstoerung freigeben
   TRY_GLFW(glfwTerminate());  // Destroys any remaining windows
   return true;
@@ -464,7 +470,7 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
   }
 
   // Load data into graphics card memory
-  if (!m_Scene.LoadIntoGraphicsCardMemory()) {
+  if (!m_Scene.LoadIntoGraphicsCardMemory(m_TextureCache)) {
     std::cerr << "Loading data into graphics card memory failed\n";
     return false;
   }
@@ -543,6 +549,7 @@ ls3render_EXPORT int ls3render_Render(void* Ausgabepuffer) {
 
 ls3render_EXPORT void ls3render_Reset() {
   m_Scene = Scene {};
+  m_TextureCache.clear();
   m_BBox = kInvalidBBox;
   m_ModelBackX = 0;
   m_ModelFrontX = 0;

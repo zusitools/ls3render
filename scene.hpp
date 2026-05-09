@@ -19,6 +19,7 @@ namespace zusixml {
 namespace ls3render {
 
 struct ShaderParameters;
+class TextureCache;
 
 /**
  * Beschreibt einen radialen Strahlen-Stern, der ueber einem aktuell blinkenden
@@ -62,7 +63,14 @@ class Scene {
    */
   bool LadeLandschaft(std::unique_ptr<Zusi> zusi_datei, const zusixml::ZusiPfad& dateiname, const glm::mat4& transform, const std::unordered_set<std::string>& aktive_ani_namen, const std::unordered_set<std::string>& blink_ani_namen, float dimmung_alpha = 1.0f);
   void UpdateBoundingBox(std::pair<glm::vec3, glm::vec3>* bbox);
-  bool LoadIntoGraphicsCardMemory();
+  /**
+   * Laedt Geometrie und Texturen der Szene in den Grafikkartenspeicher.
+   * Texturen werden ueber den uebergebenen @p textureCache geladen, sodass
+   * eine Datei nur beim ersten Aufruf vom Datentraeger geholt wird; Folgeauf-
+   * rufe (auch ueber mehrere @ref Render-Zyklen hinweg) verwenden den vor-
+   * handenen Eintrag.
+   */
+  bool LoadIntoGraphicsCardMemory(TextureCache& textureCache);
   void Render(const ShaderParameters& shader_parameters) const;
   void FreeGraphicsCardMemory();
 
