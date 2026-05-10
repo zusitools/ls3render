@@ -232,6 +232,7 @@ ls3render_EXPORT int ls3render_Init() {
   m_ShaderParameters.uni_proj = glGetUniformLocation(shader_program, "proj");
   m_ShaderParameters.uni_shear = glGetUniformLocation(shader_program, "shear");
   m_ShaderParameters.uni_diffuse_color = glGetUniformLocation(shader_program, "diffuseColor");
+  m_ShaderParameters.uni_ambient_color = glGetUniformLocation(shader_program, "ambientColor");
   m_ShaderParameters.uni_emissive_color = glGetUniformLocation(shader_program, "emissiveColor");
 
   // Fragment shader

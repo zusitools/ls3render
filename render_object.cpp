@@ -262,6 +262,11 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
           mesh_subset->Cd.g / 255.0,
           mesh_subset->Cd.b / 255.0,
           mesh_subset->Cd.a / 255.0));
+    TRY(glUniform4f(shaderParameters.uni_ambient_color,
+          mesh_subset->Ca.r / 255.0,
+          mesh_subset->Ca.g / 255.0,
+          mesh_subset->Ca.b / 255.0,
+          mesh_subset->Ca.a / 255.0));
     TRY(glUniform4f(shaderParameters.uni_emissive_color,
           mesh_subset->Ce.r / 255.0,
           mesh_subset->Ce.g / 255.0,
@@ -328,7 +333,11 @@ bool Ls3RenderObject::render(const ShaderParameters& shaderParameters) const {
     if ((texVoreinstellung == 4) || ((texVoreinstellung >= 6) && (texVoreinstellung <= 9)) || (texVoreinstellung == 12) || (dimmungAlpha < 1.0f)) {
         // Enable alpha blending
         TRY(glEnable(GL_BLEND));
-        TRY(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
+        if (texVoreinstellung == 6) {
+          TRY(glBlendFuncSeparate(GL_ONE_MINUS_SRC_ALPHA, GL_SRC_COLOR, GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
+        } else {
+          TRY(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
+        }
     } else {
         TRY(glDisable(GL_BLEND));
     }

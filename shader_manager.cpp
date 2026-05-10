@@ -101,6 +101,8 @@ struct ShaderManager::impl {
         glGetUniformLocation(shader_program, "numTextures");
     m_ShaderParameters.uni_diffuse_color =
         glGetUniformLocation(shader_program, "diffuseColor");
+    m_ShaderParameters.uni_ambient_color =
+        glGetUniformLocation(shader_program, "ambientColor");
     m_ShaderParameters.uni_emissive_color =
         glGetUniformLocation(shader_program, "emissiveColor");
     m_ShaderParameters.uni_alphaCutoff =

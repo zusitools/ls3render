@@ -1,9 +1,7 @@
 R""(
 #version 150
 
-in vec3 Normal;
-in vec4 DiffuseColor;
-in vec4 EmissiveColor;
+in vec4 GouraudShadedColor;
 in vec2 UV1;
 in vec2 UV2;
 
@@ -17,38 +15,35 @@ uniform int texVoreinstellung;
 uniform float dimmungAlpha;
 
 void main() {
-  vec4 texColor = texture(tex1, UV1);
+  vec4 texColor1 = (numTextures > 0) ? texture(tex1, UV1) : vec4(1,1,1,1);
 
-  if (texColor.a < alphaCutoff) {
+  // Alpha test (FFP D3DCMP_GREATEREQUAL with alpha_ref/255 thresholds)
+  if (texColor1.a < alphaCutoff) {
     discard;
   }
 
+  vec3 outRGB;
   if (texVoreinstellung == 3) {
     // Tex 1 Standard, Tex 2 transparent
-    vec4 tex2Color = texture(tex2, UV2);
-    texColor = mix(texColor, tex2Color, tex2Color.a);
+    vec4 texColor2 = (numTextures > 1) ? texture(tex2, UV2) : vec4(1,1,1,1);
+    outRGB = GouraudShadedColor.rgb * mix(texColor1.rgb, texColor2.rgb, texColor2.a);
+  } else {
+    outRGB = texColor1.rgb * GouraudShadedColor.rgb;
   }
-
-  const float ambient = 0.4;
-  float kd = max(0.0, ambient + (1 - ambient) * dot(normalize(vec3(-1, 0, 1)), Normal));
-  vec4 baseColor = vec4(kd, kd, kd, 1.0) * DiffuseColor;
-  baseColor.xyz += EmissiveColor.xyz;
 
   if (texVoreinstellung == 4 || (texVoreinstellung >= 6 && texVoreinstellung <= 9)) {
     // Halbtransparenz
     if (numTextures == 0) {
       // Nur wenn keine Textur angegeben ist, wird vom Farbwert auch die Alpha-Komponente verwendet.
       // Die wird wiederum nur gebraucht, wenn Alpha-Blending aktiv ist.
-      outColor = baseColor;
+      outColor = vec4(outRGB, GouraudShadedColor.a);
     } else {
-      outColor = texColor * vec4(baseColor.rgb, 1.0);
+      outColor = vec4(outRGB, texColor1.a);
     }
   } else {
-    outColor = vec4(texColor.rgb * baseColor.rgb, 1.0);
+    outColor = vec4(outRGB, 1.0);
   }
 
-  // Animations-Dimmung: 0 = vollstaendig durchsichtig, 1 = vollstaendig undurchsichtig
-  // (in Zusi ist es anders herum!).
   outColor.a *= dimmungAlpha;
 }
 )""
