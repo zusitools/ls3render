@@ -142,6 +142,7 @@ install(TARGETS ls3render DESTINATION bin)
 IF (MINGW)
     SET_TARGET_PROPERTIES(ls3render PROPERTIES LINK_FLAGS "-Wl,--output-def,libls3render.def")
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/libls3render.def DESTINATION lib)
+    target_compile_definitions(ls3render PRIVATE _USE_MATH_DEFINES)  # for M_PI
 ENDIF (MINGW)
 
 # i686-w64-mingw32.static-strip -K _ls3render_AddSignalFrame -K _ls3render_Cleanup -K _ls3render_GetAusgabepufferGroesse -K _ls3render_GetBildbreite -K _ls3render_GetBildhoehe -K _ls3render_Init -K _ls3render_Render -K _ls3render_Reset -K _ls3render_SetAxonometrieParameter -K _ls3render_SetMultisampling -K _ls3render_SetPixelProMeter libls3render.dll

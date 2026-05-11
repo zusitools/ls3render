@@ -1,17 +1,4 @@
-#if defined _WIN32 || defined __CYGWIN__
-  #ifdef ls3render_EXPORTS
-    #define ls3render_EXPORT __declspec(dllexport)
-  #else
-    #define ls3render_EXPORT __declspec(dllimport)
-  #endif
-  #define DLL_LOCAL
-#else
-  #if __GNUC__ >= 4
-    #define ls3render_EXPORT __attribute__ ((visibility ("default")))
-  #else
-    #define ls3render_EXPORT
-  #endif
-#endif
+#define ls3render_EXPORT
 
 #include <stdint.h>
 
